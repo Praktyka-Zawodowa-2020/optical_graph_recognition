@@ -1,3 +1,4 @@
+"""Module with operations that are used to segment a graph picture"""
 import cv2 as cv
 import numpy as np
 
@@ -12,13 +13,20 @@ INNER_CANNY = 200
 CIRCLE_THRESHOLD = 13
 
 # Below are other constants
-K = 4  # Consider 2 or 3 for lower resolutions
+K = 4  # Consider 2 or 3 for lower and bigger K for higher resolutions
 KERNEL_SIZE = 3  # Must be an odd number
 COLOR_R_FACTOR = 0.5  # Should be < 1.0
 
 
-# performs all steps in segmentation phase to detect vertices
 def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool) -> list:
+    """
+    Detect vertices in preprocessed image and return them in a list
+    :param source: resized input image
+    :param binary: binarized image from preprocessing phase
+    :param preprocessed: fully preprocessed image
+    :param imshow_enabled: flag determining to display (or not) segmentation steps with imshow function
+    :return vertices_list: list of detected Vertices (objects of Vertex class)
+    """
     # fill unfilled vertices
     filled = fill_vertices(preprocessed)
 
@@ -26,7 +34,7 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
     edgeless = remove_edges(filled)
 
     # detect vertices
-    visualised, vertices_list = find_vertices(source, binary, edgeless)
+    vertices_list, visualised  = find_vertices(source, binary, edgeless)
 
     # display results of certain steps
     if imshow_enabled:
@@ -37,9 +45,14 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
     return vertices_list
 
 
-# detects unfilled vertices and fills them in given image
 def fill_vertices(image: np.ndarray) -> np.ndarray:
+    """
+    Detect unfilled vertices in preprocessed image. Return image with vertices filled with object color (white)
+    :param image: preprocessed image
+    :return image: image with filled vertices
+    """
     input_width = image.shape[1]
+    # detect unfilled circles with Hough circles transform (parametrized based on image width)
     unfilled_v = cv.HoughCircles(
         image, cv.HOUGH_GRADIENT, 1,
         minDist=floor(input_width * DIST_FACTOR),
@@ -59,8 +72,12 @@ def fill_vertices(image: np.ndarray) -> np.ndarray:
     return image
 
 
-# removes edges by performing erosion and dilation K times (also removes some noise remaining after preprocessing)
 def remove_edges(image: np.ndarray) -> np.ndarray:
+    """
+    Remove graph edges by performing erosion and dilation K times (also removes noise if some remained)
+    :param image: preprocessed image with filled vertices
+    :return dilated: image without edges (only vertices pixels)
+    """
     kernel = np.ones((KERNEL_SIZE, KERNEL_SIZE), np.uint8)
     # eroding k times
     eroded = cv.erode(image, kernel, iterations=K)
@@ -69,8 +86,14 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     return dilated
 
 
-# finds vertices based on detected contours in the edgeless image
-def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) -> (np.ndarray, list):
+def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) -> (list, np.ndarray):
+    """
+    Finds vertices based on detected contours in the edgeless image. Return list of those vertices.
+    :param source: input image
+    :param binary: binarized image from preprocessing phase
+    :param edgeless: preprocessed image with filled vertices and without edges
+    :return: list of detected vertices and their visualisation drawn on source image
+    """
     # finding contours of vertices
     contours, _ = cv.findContours(edgeless, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
@@ -97,19 +120,18 @@ def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) 
         thickness = cv.FILLED if color == 255 else 2
         cv.circle(visualized, (x, y), r_final, (0, 255, 0), thickness, 8, 0)
 
-    return visualized, vertices_list
+    return vertices_list, visualized
 
 
-# determines vertex color by finding dominant color in vertex inner circle excluding border pixels (r_factor < 1.0)
 def determine_binary_color(binary: np.ndarray, x: int, y: int, r_original: float, r_factor: float) -> int:
     """
-
-    :param binary:
-    :param x:
-    :param y:
-    :param r_original:
-    :param r_factor:
-    :return:
+    Determine vertex color by finding dominant color in vertex inner circle (excluding border pixels - r_factor < 1.0).
+    :param binary: binarized image from preprocessing phase
+    :param x: coordinate of vertex center
+    :param y: coordinate of vertex center
+    :param r_original: vertex radius
+    :param r_factor: factor used to reduce original radius to exclude borders of unfilled vertex.
+    :return: Dominant color in vertex area
     """
     if x >= 0 and y >= 0 and r_factor < 1.0:
         r = round(r_original * r_factor)  # calculate new, smaller, radius
