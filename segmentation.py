@@ -18,14 +18,14 @@ KERNEL_SIZE = 3  # Must be an odd number
 COLOR_R_FACTOR = 0.5  # Should be < 1.0
 
 
-def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool) -> list:
+def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool) -> [list, np.ndarray]:
     """
     Detect vertices in preprocessed image and return them in a list
     :param source: resized input image
     :param binary: binarized image from preprocessing phase
     :param preprocessed: fully preprocessed image
     :param imshow_enabled: flag determining to display (or not) segmentation steps with imshow function
-    :return vertices_list: list of detected Vertices (objects of Vertex class)
+    :return vertices_list: list of detected Vertices (objects of Vertex class) and visualised results of detection
     """
     # fill unfilled vertices
     filled = fill_vertices(preprocessed)
@@ -42,7 +42,7 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
         cv.imshow("edgeless", edgeless)
         cv.imshow(str(len(vertices_list))+" detected vertices", visualised)
 
-    return vertices_list
+    return vertices_list, visualised
 
 
 def fill_vertices(image: np.ndarray) -> np.ndarray:

@@ -4,6 +4,7 @@ import cv2 as cv
 
 from preprocessing import preprocess
 from segmentation import segment
+from topology_recognition import recognize_topology
 
 
 def load_image(file_index):
@@ -16,20 +17,24 @@ def load_image(file_index):
         "tablica3.jpg",  # 5
         "tablet_graficzny.png",  # 6
         "paint_1.jpg",  # 7
+        "article.png",
+        "article_no_text.png"
     ]
     source = cv.imread("./graphs/" + file_names[file_index])
     return source
 
 
 def main(args):
-    source = load_image(file_index=0)
+    source = load_image(file_index=3)
 
     if source is not None:  # read successful, process image
 
-        source, binary, preprocessed = preprocess(source, True)
+        source, binary, preprocessed = preprocess(source, False)
 
-        vertices_list = segment(source, binary, preprocessed, True)
+        vertices_list, visualised = segment(source, binary, preprocessed, False)
 
+        recognize_topology(vertices_list, preprocessed, visualised)
+        cv.imshow("source", source)
         # display all windows until key is pressed
         cv.waitKey(0)
         return 0
