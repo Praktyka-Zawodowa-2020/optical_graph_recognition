@@ -34,3 +34,24 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
         cv.imshow("filtered", filtered)
 
     return source, binary, filtered
+
+def deletes_characters(image: np.ndarray) -> np.ndarray:
+    """
+    Removes "characters" (noise) of small sizes
+    :param image: Image after binarization
+    :return: Image withoute noise
+    """
+    contours, hierarchy = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # findContours returns 3 variables for getting contours
+
+    for contour in contours:
+        # get rectangle bounding contour
+        [x, y, w, h] = cv2.boundingRect(contour)
+
+        # Ignore large counters
+        if w > 60 and h > 60:
+            continue
+
+        # draw rectangle on original image
+        cv2.rectangle(image, (x, y), (x + w, y + h), 0, -1)
+
+    return image
