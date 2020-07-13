@@ -2,12 +2,10 @@
 import cv2 as cv
 import numpy as np
 
-
 # constants
 MIN_RESIZE = 960  # px
 
 
-# performs all steps in preprocessing phase
 def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndarray, np.ndarray):
     """
     Processes source image by resizing, thresholding and filering noise.
@@ -16,7 +14,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
     :return: resized, binarized, and filtered images.
     """
     # Resize if needed
-    resize_factor = MIN_RESIZE/source.shape[1]
+    resize_factor = MIN_RESIZE / source.shape[1]
     source = source if source.shape[1] <= MIN_RESIZE else cv.resize(source, (0, 0), fx=resize_factor, fy=resize_factor)
 
     # converting image to gray scale
