@@ -43,31 +43,32 @@ def pixel_value(img: np.ndarray, i: int, j: int, direction: int) -> int:
         [1, 0, 1],
         [1, 1, 1]
     ]  # determines the pixel distance from the center
-    minimum = []
+    maximum = []
+    maximum.append(0)
     if direction == 1:  # forward
         i -= 1
         j -= 1
         for x in range(0, 3):
             for y in range(0, 3):
                 if x == 1 and y == 1:
-                    return min(minimum)
+                    return max(maximum)
                 if array_scope_control(img, i + x, j + y):
-                    if (img[i + x][j + y] + mask[x][y]) == 256:
-                        minimum.append(0)
+                    if (img[i + x][j + y] - mask[x][y]) == -1:
+                        maximum.append(255)
                     else:
-                        minimum.append(img[i + x][j + y] + mask[x][y])
+                        maximum.append(img[i + x][j + y] - mask[x][y])
     else:  # backward
         i += 1
         j += 1
         for x in range(0, 3):
             for y in range(0, 3):
                 if x == 1 and y == 1:
-                    return min(minimum)
+                    return max(maximum)
                 if array_scope_control(img, i - x, j - y):
-                    if (img[i - x][j - y] + mask[x][y]) == 256:
-                        minimum.append(0)
+                    if (img[i - x][j - y] - mask[x][y]) == -1:
+                        maximum.append(255)
                     else:
-                        minimum.append(img[i - x][j - y] + mask[x][y])
+                        maximum.append(img[i - x][j - y] - mask[x][y])
 
 
 def chamford(img: np.ndarray) -> np.ndarray:
@@ -78,7 +79,7 @@ def chamford(img: np.ndarray) -> np.ndarray:
     Forward: goes right and down
     Backward: goes left up
 
-    :param img: binary image. 255 pixel is background
+    :param img: binary image. 0 pixel is background
     :return: image with the distance of the image pixels from the background
     """
     width, height = img.shape[:2]
@@ -87,16 +88,16 @@ def chamford(img: np.ndarray) -> np.ndarray:
     # forward
     for i in range(math.floor((size + 1) / 2), width):
         for j in range(math.floor((size + 1) / 2), height):
-            if img[i][j] < 255:
+            if img[i][j] > 0:
                 chamford_image[i][j] = pixel_value(chamford_image, i, j, 1)
             else:
                 chamford_image[i][j] = img[i][j]
     # backward
     for i in range(math.floor(width - (size - 1) / 2), 0, -1):
         for j in range(math.floor(height - (size - 1) / 2), 0, -1):
-            if img[i][j] < 255:
+            if img[i][j] > 0:
                 val = pixel_value(chamford_image, i, j, 2)
-                if val < chamford_image[i][j]:
+                if val > chamford_image[i][j]:
                     chamford_image[i][j] = val
 
     return chamford_image
@@ -119,14 +120,14 @@ def spr_local_extreme(img: np.ndarray, i: int, j: int, val: int) -> bool:
             if x == 1 and y == 1:
                 continue
             if array_scope_control(img, i - x, j - y):
-                if img[i - x][j - y] > val and img[i - x][j - y] != 255:  # if the pixel is 255, its a background
+                if img[i - x][j - y] > val and img[i - x][j - y] != 0:  # if the pixel is 255, its a background
                     return False
     return True
 
 
-def extreme(img: np.ndarray) -> (int,int) :
+def extreme(img: np.ndarray) -> (int, int):
     """
-    Image must be after chamford function, background pixel value must be 255
+    Image must be after chamford function, background pixel value must be 0
     Finds min and max object extremum in image
     Object extremum is the furthest pixel distance from the background
 
@@ -135,19 +136,25 @@ def extreme(img: np.ndarray) -> (int,int) :
     :return: minimum,maximum
     """
     width, height = img.shape[:2]
-    extremes = []
-    max_extreme = 0
+    max_extreme = 255
     # find max extreme value
     for i in range(0, width):
         for j in range(0, height):
-            if max_extreme < img[i][j] < 255:
+            if max_extreme > img[i][j] > 0:
                 max_extreme = img[i][j]
-    # find all local extreme value
-    for val in range(1, max_extreme):
+
+    # specifies the maximum edge thickness(in the image, the max edge thickness is (255-edge_thickness) * 2 pixels)
+    if max_extreme < 245:
+        edge_thickness = 245
+    else:
+        edge_thickness = max_extreme
+
+    # find minimum extreme value
+    for val in range(254, edge_thickness, -1):
         for i in range(0, width):
             for j in range(0, height):
                 if img[i][j] == val:
                     if spr_local_extreme(img, i, j, val):
-                        extremes.append(val)
+                        return 255-val, 255-max_extreme
 
-    return min(extremes), max_extreme
+    return 255-245, 255-max_extreme
