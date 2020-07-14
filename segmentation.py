@@ -4,7 +4,7 @@ import numpy as np
 
 from math import ceil, floor, sqrt
 from Vertex import Vertex
-
+from chamford import chamford, extreme
 # Below are constants for HoughCircles function
 MAX_R_FACTOR = 0.035
 MIN_R_FACTOR = 0.005
@@ -78,11 +78,12 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     :param image: preprocessed image with filled vertices
     :return dilated: image without edges (only vertices pixels)
     """
+    K, _ = extreme(chamford(image))
     kernel = np.ones((KERNEL_SIZE, KERNEL_SIZE), np.uint8)
     # eroding k times
-    eroded = cv.erode(image, kernel, iterations=K)
+    eroded = cv.erode(image, kernel, iterations=K+2)
     # dilating k times
-    dilated = cv.dilate(eroded, kernel, iterations=K)
+    dilated = cv.dilate(eroded, kernel, iterations=K+2)
     return dilated
 
 
