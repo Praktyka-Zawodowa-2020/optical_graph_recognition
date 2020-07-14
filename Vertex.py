@@ -10,6 +10,7 @@ class Vertex:
         color (int): color in grayscale
         neighbour_list (list): list of connected vertices
     """
+    id = -1
     x = -1
     y = -1
     r = -1
