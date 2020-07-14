@@ -3,14 +3,14 @@ import cv2 as cv
 import numpy as np
 
 # constants
-MIN_RESIZE = 960  # px
+MIN_RESIZE: int = 960  # px
 
 
 def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndarray, np.ndarray):
     """
     Processes source image by resizing, thresholding and filering noise.
     :param source: input image
-    :param imshow_enabled: flag determining to display (or not) preprocessing steps with imshow function
+    :param imshow_enabled: flag determining to display (or not) preprocessing steps
     :return: resized, binarized, and filtered images.
     """
     # Resize if needed
@@ -23,9 +23,17 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
     # Threshold (binarize) image
     threshold, binary = cv.threshold(gray, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
 
-    # Remove noise from image with closing operator (first dilates and then erodes)
+    # Remove some holes from image with closing operator (first dilates and then erodes)
     kernel = np.ones((5, 5), np.uint8)
     filtered = cv.morphologyEx(binary, cv.MORPH_CLOSE, kernel)
+
+    # TODO - change parametrization of circles Transform in segmentation that works with this crop
+    # Crop images to remove unnecessary background
+    # object_pixels = cv.findNonZero(filtered)
+    # x, y, w, h = cv.boundingRect(object_pixels)
+    # source = source[y:y+h, x:x+w]
+    # binary = binary[y:y+h, x:x+w]
+    # filtered = filtered[y:y+h, x:x+w]
 
     # Display results of preprocessing steps
     if imshow_enabled:
@@ -40,9 +48,10 @@ def delete_characters(image: np.ndarray) -> np.ndarray:
     """
     Remove "characters" (noise) of small sizes
     :param image: Image after binarization
-    :return: Image withoute noise
+    :return: Image without noise
     """
-    contours, hierarchy = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)  # findContours returns 3 variables for getting contours
+    # findContours returns 3 variables for getting contours
+    contours, hierarchy = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
     for contour in contours:
         # get rectangle bounding contour
