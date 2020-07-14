@@ -86,8 +86,7 @@ def find_edges(vertices_list: list, preprocessed: np.ndarray, topology_backend: 
             if point_within_radius(pt1, vertex1, WITHIN_R_FACTOR)\
                     and point_within_radius(pt2, vertex2, WITHIN_R_FACTOR)\
                     and index1 != index2\
-                    and index2 not in vertex1.neighbour_list\
-                    and index1 not in vertex2.neighbour_list:
+                    and index2 not in vertex1.neighbour_list and index1 not in vertex2.neighbour_list:
                 vertex1.neighbour_list.append(index2)
                 vertex2.neighbour_list.append(index1)
                 cv.line(visualised, (vertex1.x, vertex1.y), (vertex2.x, vertex2.y), (0, 0, 255), thickness=2)
