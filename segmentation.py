@@ -6,26 +6,26 @@ from math import ceil, floor, sqrt
 from Vertex import Vertex
 from chamford import chamford, extreme
 # Below are constants for HoughCircles function
-MAX_R_FACTOR: float = 0.035
-MIN_R_FACTOR: float = 0.005
-DIST_FACTOR: float = 0.06
-INNER_CANNY: int = 200
-CIRCLE_THRESHOLD: int = 13
+MAX_R_FACTOR = 0.035
+MIN_R_FACTOR = 0.005
+DIST_FACTOR = 0.06
+INNER_CANNY = 200
+CIRCLE_THRESHOLD = 13
 
 # Below are other constants
-K: int = 4  # Consider 2 or 3 for lower and bigger K for higher resolutions
-KERNEL_SIZE: int = 3  # Must be an odd number
-COLOR_R_FACTOR: float = 0.5  # Should be < 1.0
+K = 4  # Consider 2 or 3 for lower and bigger K for higher resolutions
+KERNEL_SIZE = 3  # Must be an odd number
+COLOR_R_FACTOR = 0.5  # Should be < 1.0
 
 
-def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool) -> [list, np.ndarray]:
+def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool) -> list:
     """
     Detect vertices in preprocessed image and return them in a list
     :param source: resized input image
     :param binary: binarized image from preprocessing phase
     :param preprocessed: fully preprocessed image
-    :param imshow_enabled: flag determining to display (or not) segmentation steps
-    :return vertices_list: list of detected Vertices (objects of Vertex class) and visualised results of detection
+    :param imshow_enabled: flag determining to display (or not) segmentation steps with imshow function
+    :return vertices_list: list of detected Vertices (objects of Vertex class)
     """
     # fill unfilled vertices
     filled = fill_vertices(preprocessed)
@@ -34,7 +34,7 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
     edgeless = remove_edges(filled)
 
     # detect vertices
-    vertices_list, visualised = find_vertices(source, binary, edgeless)
+    vertices_list, visualised  = find_vertices(source, binary, edgeless)
 
     # display results of certain steps
     if imshow_enabled:
@@ -42,7 +42,7 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
         cv.imshow("edgeless", edgeless)
         cv.imshow(str(len(vertices_list))+" detected vertices", visualised)
 
-    return vertices_list, visualised
+    return vertices_list
 
 
 def fill_vertices(image: np.ndarray) -> np.ndarray:
@@ -68,9 +68,6 @@ def fill_vertices(image: np.ndarray) -> np.ndarray:
             center = (i[0], i[1])
             radius = i[2]
             cv.circle(image, center, round(radius), 255, thickness=cv.FILLED, lineType=8, shift=0)
-
-    # Vertices are not perfect circles so after circle fill we fill small gaps inside vertices with closing operation
-    image = cv.morphologyEx(image, cv.MORPH_CLOSE, np.ones((7, 7), np.uint8))
 
     return image
 
@@ -104,15 +101,14 @@ def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) 
     # creating vertices from contours
     vertices_list = []
     visualized = np.copy(source)
-    for i in range(0, len(contours)):
-        cnt = contours[i]
+    for c in contours:
         # calculating x and y
-        x = round(np.average(cnt[:, :, 0]))  # center x is average of x coordinates of a contour
-        y = round(np.average(cnt[:, :, 1]))  # similarly for y
+        x = round(np.average(c[:, :, 0]))  # center x is average of x coordinates of a contour
+        y = round(np.average(c[:, :, 1]))  # similarly for y
 
         # calculating r
-        dist = np.sqrt(np.sum(np.power(cnt - (x, y), 2), 1))  # distance from the center pixel for each pixel in contour
-        r_original = (3*np.max(dist) + np.average(dist))/4.0
+        dist = np.sqrt(np.sum(np.power(c - (x, y), 2), 1))  # distance from the center pixel for each pixel in contour
+        r_original = (3.0*np.max(dist) + np.average(dist))/4.0
         r_final = round(r_original * 1.25)  # we take a bit bigger r to ensure that vertex is inside circle area
 
         # determining vertex color
@@ -124,7 +120,6 @@ def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) 
         # creating visual representation of detected vertices
         thickness = cv.FILLED if color == 255 else 2
         cv.circle(visualized, (x, y), r_final, (0, 255, 0), thickness, 8, 0)
-        # cv.putText(visualized, str(i), (x, y), cv.QT_FONT_NORMAL, 0.75, (255, 255, 255))
 
     return vertices_list, visualized
 
