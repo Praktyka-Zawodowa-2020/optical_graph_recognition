@@ -4,7 +4,10 @@ import cv2 as cv
 
 from preprocessing import preprocess
 from segmentation import segment
+<<<<<<< HEAD
 from postprocesing import graph6_format
+=======
+>>>>>>> parent of 99fe7bf... Topology recognition (#6)
 
 
 def load_image(file_index):
@@ -30,7 +33,11 @@ def main(args):
         source, binary, preprocessed = preprocess(source, True)
 
         vertices_list = segment(source, binary, preprocessed, True)
+<<<<<<< HEAD
         graph6_format(vertices_list)
+=======
+
+>>>>>>> parent of 99fe7bf... Topology recognition (#6)
         # display all windows until key is pressed
         cv.waitKey(0)
         return 0
