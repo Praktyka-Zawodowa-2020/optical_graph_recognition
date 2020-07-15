@@ -1,5 +1,5 @@
 from Vertex import Vertex
-
+from typing import List
 
 def graph6_format(vertex: List[Vertex]):
     """

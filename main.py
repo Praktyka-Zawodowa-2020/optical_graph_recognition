@@ -4,6 +4,7 @@ import cv2 as cv
 
 from preprocessing import preprocess
 from segmentation import segment
+from postprocesing import graph6_format
 
 
 def load_image(file_index):
@@ -29,7 +30,7 @@ def main(args):
         source, binary, preprocessed = preprocess(source, True)
 
         vertices_list = segment(source, binary, preprocessed, True)
-
+        graph6_format(vertices_list)
         # display all windows until key is pressed
         cv.waitKey(0)
         return 0
