@@ -21,19 +21,21 @@ def graph6_format(vertex: List[Vertex]):
         for j in range(0, i):
             adjacency_list.append(adjacency_matrix[j][i])
 
+    #align on the right with 0 so that the length is a multiple of 6.
     if len(adjacency_list) % 6 != 0:
         while len(adjacency_list) % 6 != 0:
             adjacency_list.append(0)
 
     f = open("graph.g6", "wb")
     if size < 63:
-        f.write((size + 63).to_bytes(1,byteorder='big'))
+        f.write((size + 63).to_bytes(1, byteorder='big'))
     elif 63 <= size <= 258047:
         f.write((126).to_bytes(1, byteorder='big'))
     elif 258047 <= size <= 68719476735:
         f.write((126).to_bytes(1, byteorder='big'))
         f.write((126).to_bytes(1, byteorder='big'))
     else:
+        f.close()
         print("too many vertices")
         return
 
@@ -43,7 +45,7 @@ def graph6_format(vertex: List[Vertex]):
         val = val << 1
         k += 1
         if k % 6 == 5:
-            f.write((val+63).to_bytes(1, byteorder='big'))
+            f.write((val + 63).to_bytes(1, byteorder='big'))
             val = 0
 
     f.close()
