@@ -4,10 +4,7 @@ import cv2 as cv
 
 from preprocessing import preprocess
 from segmentation import segment
-<<<<<<< HEAD
-from postprocesing import graph6_format
-=======
->>>>>>> parent of 99fe7bf... Topology recognition (#6)
+from topology_recognition import recognize_topology
 
 
 def load_image(file_index):
@@ -20,24 +17,27 @@ def load_image(file_index):
         "tablica3.jpg",  # 5
         "tablet_graficzny.png",  # 6
         "paint_1.jpg",  # 7
+        "paint_2.jpg",  # 8
+        "paint_3.jpg",  # 9
+        "paint_4.jpg",  # 10
+        "article.png",
+        "article_no_text.png"
     ]
     source = cv.imread("./graphs/" + file_names[file_index])
     return source
 
 
 def main(args):
-    source = load_image(file_index=0)
+    source = load_image(file_index=3)
 
     if source is not None:  # read successful, process image
 
-        source, binary, preprocessed = preprocess(source, True)
+        source, binary, preprocessed = preprocess(source, False)
 
-        vertices_list = segment(source, binary, preprocessed, True)
-<<<<<<< HEAD
-        graph6_format(vertices_list)
-=======
+        vertices_list, visualised = segment(source, binary, preprocessed, False)
 
->>>>>>> parent of 99fe7bf... Topology recognition (#6)
+        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, True)
+        cv.imshow("source", source)
         # display all windows until key is pressed
         cv.waitKey(0)
         return 0
@@ -46,5 +46,5 @@ def main(args):
         return -1
 
 
-if __name__ == "__main__":
-    main(sys.argv[1:])
+# if __name__ == "__main__":
+main(sys.argv[1:])
