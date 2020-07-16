@@ -3,22 +3,22 @@ import cv2 as cv
 import numpy as np
 
 # constants
-MIN_RESIZE: int = 960  # px
+WIDTH_LIM: int = 1280  # px
+HEIGHT_LIM: int = 800
 
 
 def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndarray, np.ndarray):
     """
-    Processes source image by resizing, thresholding and filering noise.
+    Processes source image by reshaping, thresholding and noise filering.
     :param source: input image
     :param imshow_enabled: flag determining to display (or not) preprocessing steps
-    :return: resized, binarized, and filtered images.
+    :return: reshaped, binarized, and filtered images.
     """
-    # Resize if needed
-    resize_factor = MIN_RESIZE / source.shape[1]
-    source = source if source.shape[1] <= MIN_RESIZE else cv.resize(source, (0, 0), fx=resize_factor, fy=resize_factor)
+    # reshape to standard orientation, and resolution
+    reshaped = reshape(source, WIDTH_LIM, HEIGHT_LIM)
 
     # converting image to gray scale
-    gray = cv.cvtColor(source, cv.COLOR_BGR2GRAY)
+    gray = cv.cvtColor(reshaped, cv.COLOR_BGR2GRAY)
 
     # Threshold (binarize) image
     threshold, binary = cv.threshold(gray, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
@@ -37,11 +37,37 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
 
     # Display results of preprocessing steps
     if imshow_enabled:
-        cv.imshow("source " + str(source.shape[1]) + "x" + str(source.shape[0]), source)
+        cv.imshow("reshaped source " + str(reshaped.shape[1]) + "x" + str(reshaped.shape[0]), reshaped)
         cv.imshow("binary, th=" + str(threshold), binary)
         cv.imshow("filtered", filtered)
 
-    return source, binary, filtered
+    return reshaped, binary, filtered
+
+
+def reshape(image: np.ndarray, width_lim: int, height_lim: int):
+    """
+    Scale image preserving original width to height ratio
+    Do it so that its height and width are less or equal (and close to) given limits.
+    Also if image is oriented horizontally, orient it vertically. (TODO - is reshaping breaking OCR?)
+    :param image: input image
+    :param width_lim: limit for width
+    :param height_lim: limit for height
+    :return: reshaped (scaled and rotated if needed) image
+    """
+    img_width = image.shape[1]
+    img_height = image.shape[0]
+    if img_height > img_width:      # If image is oriented horizontally - rotate to orient vertically
+        image = cv.rotate(image, cv.ROTATE_90_CLOCKWISE)
+
+    width_factor = width_lim / img_width
+    image = cv.resize(image, (0, 0), fx=width_factor, fy=width_factor)
+
+    img_res_height = image.shape[0]     # height after first scaling
+    if img_res_height > height_lim:     # scale again if new height is still too large
+        height_factor = height_lim / img_res_height
+        image = cv.resize(image, (0, 0), fx=height_factor, fy=height_factor)
+
+    return image
 
 
 def delete_characters(image: np.ndarray) -> np.ndarray:

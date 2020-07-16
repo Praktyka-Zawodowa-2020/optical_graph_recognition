@@ -33,9 +33,9 @@ def main(args):
 
     if source is not None:  # read successful, process image
 
-        source, binary, preprocessed = preprocess(source, False)
+        source, binary, preprocessed = preprocess(source, True)
 
-        vertices_list, visualised = segment(source, binary, preprocessed, False)
+        vertices_list, visualised = segment(source, binary, preprocessed, True)
 
         vertices_list = recognize_topology(vertices_list, preprocessed, visualised, True)
 
