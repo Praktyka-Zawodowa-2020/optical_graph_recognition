@@ -125,7 +125,7 @@ def spr_local_extreme(img: np.ndarray, i: int, j: int, val: int) -> bool:
     return True
 
 
-def extreme(img: np.ndarray) -> (int, int):
+def extreme(img: np.ndarray) -> (int, int, int):
     """
     Image must be after chamford function, background pixel value must be 0
     Finds min and max object extremum in image
@@ -133,9 +133,10 @@ def extreme(img: np.ndarray) -> (int, int):
 
 
     :param img: Image
-    :return: minimum,maximum
+    :return: minimum,sr_extreme, maximum
     """
     width, height = img.shape[:2]
+    extremes = []
     max_extreme = 255
     # find max extreme value
     for i in range(0, width):
@@ -149,12 +150,13 @@ def extreme(img: np.ndarray) -> (int, int):
     else:
         edge_thickness = max_extreme
 
+    extremes.append(max_extreme)
     # find minimum extreme value
     for val in range(254, edge_thickness, -1):
         for i in range(0, width):
             for j in range(0, height):
                 if img[i][j] == val:
                     if spr_local_extreme(img, i, j, val):
-                        return 255-val, 255-max_extreme
+                        extremes.append(val)
 
-    return 255-245, 255-max_extreme
+    return 255-max(extremes), int((255-max(extremes)+255-max_extreme)/2), 255 - max_extreme
