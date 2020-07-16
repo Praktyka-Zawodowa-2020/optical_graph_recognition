@@ -5,7 +5,7 @@ import cv2 as cv
 from preprocessing import preprocess
 from segmentation import segment
 from topology_recognition import recognize_topology
-
+from postprocesing import graph6_format, graphml_format
 
 def load_image(file_index):
     file_names = [
@@ -37,10 +37,10 @@ def main(args):
         vertices_list, visualised = segment(source, binary, preprocessed, False)
 
         vertices_list = recognize_topology(vertices_list, preprocessed, visualised, True)
+
         cv.imshow("source", source)
         # display all windows until key is pressed
         cv.waitKey(0)
-        return 0
     else:
         print("Error opening image!")
         return -1
