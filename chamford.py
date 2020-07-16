@@ -19,90 +19,6 @@ def array_scope_control(img: np.ndarray, i: int, j: int) -> bool:
         return False
 
 
-def pixel_value(img: np.ndarray, i: int, j: int, direction: int) -> int:
-    """
-    Calculate the pixel(i,j) value for the chamford function
-    Forward: use    [*, *, *] mask
-                    [*, 0, -]
-                    [-, -, -]
-
-    Backward: use   [-, -, -] mask
-                    [-, 0, *]
-                    [*, *, *]
-
-    where '*' value is uses, '0' is center of mask (the center is located in pixel(i,j)), '-' value is non used
-
-    :param img: input image
-    :param i:
-    :param j:
-    :param direction: determines the phase forward or backward
-    :return: minimum pixel distance from the background
-    """
-    mask = [
-        [1, 1, 1],
-        [1, 0, 1],
-        [1, 1, 1]
-    ]  # determines the pixel distance from the center
-    maximum = []
-    maximum.append(0)
-    if direction == 1:  # forward
-        i -= 1
-        j -= 1
-        for x in range(0, 3):
-            for y in range(0, 3):
-                if x == 1 and y == 1:
-                    return max(maximum)
-                if array_scope_control(img, i + x, j + y):
-                    if (img[i + x][j + y] - mask[x][y]) == -1:
-                        maximum.append(255)
-                    else:
-                        maximum.append(img[i + x][j + y] - mask[x][y])
-    else:  # backward
-        i += 1
-        j += 1
-        for x in range(0, 3):
-            for y in range(0, 3):
-                if x == 1 and y == 1:
-                    return max(maximum)
-                if array_scope_control(img, i - x, j - y):
-                    if (img[i - x][j - y] - mask[x][y]) == -1:
-                        maximum.append(255)
-                    else:
-                        maximum.append(img[i - x][j - y] - mask[x][y])
-
-
-def chamford(img: np.ndarray) -> np.ndarray:
-    """
-    Calculate the distance of the pixel from the background
-
-    Chamford algorithm have two steps:
-    Forward: goes right and down
-    Backward: goes left up
-
-    :param img: binary image. 0 pixel is background
-    :return: image with the distance of the image pixels from the background
-    """
-    width, height = img.shape[:2]
-    size = 3  # size mask in pixel_value
-    chamford_image = np.zeros((width, height), np.uint8)
-    # forward
-    for i in range(math.floor((size + 1) / 2), width):
-        for j in range(math.floor((size + 1) / 2), height):
-            if img[i][j] > 0:
-                chamford_image[i][j] = pixel_value(chamford_image, i, j, 1)
-            else:
-                chamford_image[i][j] = img[i][j]
-    # backward
-    for i in range(math.floor(width - (size - 1) / 2), 0, -1):
-        for j in range(math.floor(height - (size - 1) / 2), 0, -1):
-            if img[i][j] > 0:
-                val = pixel_value(chamford_image, i, j, 2)
-                if val > chamford_image[i][j]:
-                    chamford_image[i][j] = val
-
-    return chamford_image
-
-
 def spr_local_extreme(img: np.ndarray, i: int, j: int, val: int) -> bool:
     """
     Determine whether pixel (i, j) is a local extreme
@@ -137,26 +53,26 @@ def extreme(img: np.ndarray) -> (int, int, int):
     """
     width, height = img.shape[:2]
     extremes = []
-    max_extreme = 255
+    max_extreme = 0
     # find max extreme value
     for i in range(0, width):
         for j in range(0, height):
-            if max_extreme > img[i][j] > 0:
-                max_extreme = img[i][j]
+            if max_extreme < img[i][j] > 0:
+                max_extreme = int(img[i][j])
 
     # specifies the maximum edge thickness(in the image, the max edge thickness is (255-edge_thickness) * 2 pixels)
-    if max_extreme < 245:
-        edge_thickness = 245
+    if max_extreme > 15:
+        edge_thickness = 15
     else:
         edge_thickness = max_extreme
 
     extremes.append(max_extreme)
     # find minimum extreme value
-    for val in range(254, edge_thickness, -1):
+    for val in range(0, edge_thickness, 1):
         for i in range(0, width):
             for j in range(0, height):
                 if img[i][j] == val:
                     if spr_local_extreme(img, i, j, val):
-                        extremes.append(val)
+                        return int((val+max_extreme)/2)
 
-    return 255-max(extremes), int((255-max(extremes)+255-max_extreme)/2), 255 - max_extreme
+    return int(max_extreme/2)

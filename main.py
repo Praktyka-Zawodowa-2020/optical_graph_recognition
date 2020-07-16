@@ -24,11 +24,12 @@ def load_image(file_index):
         "article_no_text.png"
     ]
     source = cv.imread("./graphs/" + file_names[file_index])
+    # source = cv.imread("../../Praktyki2020/Resources/01.jpg")
     return source
 
 
 def main(args):
-    source = load_image(file_index=3)
+    source = load_image(file_index=0)
 
     if source is not None:  # read successful, process image
 
