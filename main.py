@@ -7,6 +7,7 @@ from segmentation import segment
 from topology_recognition import recognize_topology
 from postprocesing import graph6_format, graphml_format
 
+
 def load_image(file_index):
     file_names = [
         "notebook_black_1.jpg",  # 0

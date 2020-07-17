@@ -1,12 +1,10 @@
-import cv2 as cv
 import numpy as np
-
-import math
 
 
 def array_scope_control(img: np.ndarray, i: int, j: int) -> bool:
     """
     check if (i,j) is in the table
+
     :param img: input image
     :param i:
     :param j:
@@ -46,7 +44,6 @@ def extreme(img: np.ndarray) -> (int, int, int):
     Image must be after chamford function, background pixel value must be 0
     Finds min and max object extremum in image
     Object extremum is the furthest pixel distance from the background
-
 
     :param img: Image
     :return: minimum,sr_extreme, maximum
