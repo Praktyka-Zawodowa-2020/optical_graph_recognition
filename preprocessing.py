@@ -3,8 +3,9 @@ import cv2 as cv
 import numpy as np
 
 # constants
+# for reshape function
 WIDTH_LIM: int = 1280  # px
-HEIGHT_LIM: int = 800
+HEIGHT_LIM: int = 800  # px
 
 
 def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndarray, np.ndarray):
@@ -44,7 +45,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
     return reshaped, binary, filtered
 
 
-def reshape(image: np.ndarray, width_lim: int, height_lim: int):
+def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
     """
     Scale image preserving original width to height ratio
     Do it so that its height and width are less or equal (and close to) given limits.
@@ -58,13 +59,15 @@ def reshape(image: np.ndarray, width_lim: int, height_lim: int):
     img_height = image.shape[0]
     if img_height > img_width:      # If image is oriented horizontally - rotate to orient vertically
         image = cv.rotate(image, cv.ROTATE_90_CLOCKWISE)
+        # image size changed after rotation, we only need new width
+        img_width = image.shape[1]
 
     width_factor = width_lim / img_width
     image = cv.resize(image, (0, 0), fx=width_factor, fy=width_factor)
 
-    img_res_height = image.shape[0]     # height after first scaling
-    if img_res_height > height_lim:     # scale again if new height is still too large
-        height_factor = height_lim / img_res_height
+    img_height = image.shape[0]     # Image height changed after rotation and first scaling
+    if img_height > height_lim:     # scale again if new height is still too large
+        height_factor = height_lim / img_height
         image = cv.resize(image, (0, 0), fx=height_factor, fy=height_factor)
 
     return image
