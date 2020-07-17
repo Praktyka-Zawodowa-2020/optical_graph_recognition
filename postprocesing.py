@@ -5,6 +5,7 @@ from typing import List
 def graph6_format(vertex: List[Vertex]):
     """
     Saves the graph in .graph6 format
+
     :param vertex: Lists of vertex
     :return:
     """
@@ -53,10 +54,11 @@ def graph6_format(vertex: List[Vertex]):
 
 def graphml_format(vertex: List[Vertex]):
     """
-        Saves the graph in .grapml format
-        :param vertex: Lists of vertex
-        :return:
-        """
+    Saves the graph in .grapml format
+
+    :param vertex: Lists of vertex
+    :return:
+    """
     f = open("graph.graphml", "w")
     namespace = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' \
                 + '<graphml' \

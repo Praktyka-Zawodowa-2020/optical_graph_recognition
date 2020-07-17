@@ -58,6 +58,7 @@ def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
     Scale image preserving original width to height ratio
     Do it so that its height and width are less or equal (and close to) given limits.
     Also if image is oriented horizontally, orient it vertically. (TODO - is reshaping breaking OCR?)
+
     :param image: input image
     :param width_lim: limit for width
     :param height_lim: limit for height
@@ -121,6 +122,7 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
 def delete_characters(image: np.ndarray) -> np.ndarray:
     """
     Remove "characters" (noise) of small sizes
+
     :param image: Image after binarization
     :return: Image without noise
     """

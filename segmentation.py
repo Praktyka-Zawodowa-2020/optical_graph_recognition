@@ -21,6 +21,7 @@ COLOR_R_FACTOR: float = 0.5  # Should be < 1.0
 def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool) -> [list, np.ndarray]:
     """
     Detect vertices in preprocessed image and return them in a list
+
     :param source: resized input image
     :param binary: binarized image from preprocessing phase
     :param preprocessed: fully preprocessed image
@@ -48,6 +49,7 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
 def fill_vertices(image: np.ndarray) -> np.ndarray:
     """
     Detect unfilled vertices in preprocessed image. Return image with vertices filled with object color (white)
+
     :param image: preprocessed image
     :return image: image with filled vertices
     """
@@ -78,6 +80,7 @@ def fill_vertices(image: np.ndarray) -> np.ndarray:
 def remove_edges(image: np.ndarray) -> np.ndarray:
     """
     Remove graph edges by performing erosion and dilation K times (also removes noise if some remained)
+
     :param image: preprocessed image with filled vertices
     :return dilated: image without edges (only vertices pixels)
     """
@@ -94,6 +97,7 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
 def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) -> (list, np.ndarray):
     """
     Finds vertices based on detected contours in the edgeless image. Return list of those vertices.
+
     :param source: input image
     :param binary: binarized image from preprocessing phase
     :param edgeless: preprocessed image with filled vertices and without edges
@@ -133,6 +137,7 @@ def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) 
 def determine_binary_color(binary: np.ndarray, x: int, y: int, r_original: float, r_factor: float) -> int:
     """
     Determine vertex color by finding dominant color in vertex inner circle (excluding border pixels - r_factor < 1.0).
+
     :param binary: binarized image from preprocessing phase
     :param x: coordinate of vertex center
     :param y: coordinate of vertex center

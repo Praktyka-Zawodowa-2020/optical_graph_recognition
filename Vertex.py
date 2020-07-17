@@ -4,6 +4,7 @@
 class Vertex:
     """
     Represent vertex recognised from the image.
+
     Attributes:
         x, y (int): coordinates of the center
         r (float): radius
