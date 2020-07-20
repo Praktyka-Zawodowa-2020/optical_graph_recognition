@@ -1,7 +1,8 @@
 """Module with operations that are used to preprocess a graph picture"""
 import cv2 as cv
 import numpy as np
-
+import pytesseract
+import re
 # constants:
 # for threshold function
 GLOBAL_THRESH_FAILED = -1
@@ -13,6 +14,8 @@ HEIGHT_LIM: int = 800  # px
 # for threshold function
 MIN_BRIGHT_VAL: int = 110  # bright image lower limit of pixel value
 MAX_FILL_RATIO: float = 0.14  # ratio of object pixels to all pixels
+
+pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe'
 
 
 def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndarray, np.ndarray):
@@ -36,6 +39,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
     kernel = np.ones((5, 5), np.uint8)
     filtered = cv.morphologyEx(binary, cv.MORPH_CLOSE, kernel)
 
+    delete_characters(filtered, binary)
     # TODO - change parametrization of circles Transform in segmentation that works with this crop
     # Crop images to remove unnecessary background
     # object_pixels = cv.findNonZero(filtered)
@@ -66,7 +70,7 @@ def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
     """
     img_width = image.shape[1]
     img_height = image.shape[0]
-    if img_height > img_width:      # If image is oriented horizontally - rotate to orient vertically
+    if img_height > img_width:  # If image is oriented horizontally - rotate to orient vertically
         image = cv.rotate(image, cv.ROTATE_90_CLOCKWISE)
         # image size changed after rotation, we only need new width
         img_width = image.shape[1]
@@ -74,8 +78,8 @@ def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
     width_factor = width_lim / img_width
     image = cv.resize(image, (0, 0), fx=width_factor, fy=width_factor)
 
-    img_height = image.shape[0]     # Image height changed after rotation and first scaling
-    if img_height > height_lim:     # scale again if new height is still too large
+    img_height = image.shape[0]  # Image height changed after rotation and first scaling
+    if img_height > height_lim:  # scale again if new height is still too large
         height_factor = height_lim / img_height
         image = cv.resize(image, (0, 0), fx=height_factor, fy=height_factor)
 
@@ -100,44 +104,55 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
     print(str(np.average(gray_image)))
     if np.average(gray_image) >= min_bright_value:  # bright image
         threshold_type = cv.THRESH_BINARY_INV
-        sub_sign = 1    # for bright image we want to subtract constant value in adaptive thresholding
-    else:   # dark image
+        sub_sign = 1  # for bright image we want to subtract constant value in adaptive thresholding
+    else:  # dark image
         threshold_type = cv.THRESH_BINARY
-        sub_sign = -1    # for bright image we want to add (subtract negative) constant value in adaptive thresholding
+        sub_sign = -1  # for bright image we want to add (subtract negative) constant value in adaptive thresholding
 
     # Perform adaptive global thresholding (OTSU)
     threshold_value, binary = cv.threshold(gray_image, 0, 255, threshold_type + cv.THRESH_OTSU)
 
     # Calculate fill ratio - number of object pixels (255, white) divided by number of all pixel (height * width)
-    fill_ratio = np.count_nonzero(binary)/(binary.shape[0]*binary.shape[1])
+    fill_ratio = np.count_nonzero(binary) / (binary.shape[0] * binary.shape[1])
 
     # global OTSU thresholding failed if resulted in to many object pixels
-    if fill_ratio > max_fill_ratio:        # if it failed apply local adaptive thresholding
+    if fill_ratio > max_fill_ratio:  # if it failed apply local adaptive thresholding
         threshold_value = GLOBAL_THRESH_FAILED
-        binary = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, threshold_type, 51, sub_sign*8)
+        binary = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, threshold_type, 51, sub_sign * 8)
 
     return binary, threshold_value
 
 
-def delete_characters(image: np.ndarray) -> np.ndarray:
+def delete_characters(image: np.ndarray,binary: np.ndarray) -> np.ndarray:
     """
     Remove "characters" (noise) of small sizes
 
     :param image: Image after binarization
     :return: Image without noise
     """
+    width, height = image.shape[:2]
+
     # findContours returns 3 variables for getting contours
     contours, hierarchy = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-
+    k=0
     for contour in contours:
         # get rectangle bounding contour
         [x, y, w, h] = cv.boundingRect(contour)
-
-        # Ignore large counters
-        if w > 60 and h > 60:
-            continue
-
-        # draw rectangle on original image
-        cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
-
+        if 5 < w < 70 and 5 < h < 70:
+            if 1 < x and x + w + 4 < width and 1 < y and y + h + 4 < height:
+                x = x - 2
+                y = y - 2
+                w = w + 4
+                h = h + 4
+            crop_image = binary[y: y + h, x: x + w].copy()
+            cv.rectangle(crop_image, (0, 0), (w-1, h-1), 0, 1)
+            cv.imwrite("testCountour/"+str(k)+".jpg", crop_image)
+            letter = pytesseract.image_to_string(crop_image, config="--psm 10")
+            letter = re.findall('\w', letter)
+            print(letter)
+            if len(letter) > 0:
+                cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
+            k += 1
+    cv.imshow("binary",binary)
+    cv.imshow("Delete",image)
     return image

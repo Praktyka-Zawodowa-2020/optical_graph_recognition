@@ -55,16 +55,16 @@ def parse_argument(file_path: str) -> str:
 
 
 def main(args=None):
-    # source = load_image(file_index=0)
-    args = parser.parse_args()
-    file_path = args.path
-    formats = args.formats
-    save_path = parse_argument(file_path)
-
-    if len(save_path) == 0:
-        return -1
-
-    source = cv.imread(file_path)
+    source = load_image(file_index=0)
+    # args = parser.parse_args()
+    # file_path = args.path
+    # #formats = args.formats
+    # save_path = parse_argument(file_path)
+    #
+    # if len(save_path) == 0:
+    #     return -1
+    #
+    # source = cv.imread(file_path)
     if source is not None:  # read successful, process image
 
         source, binary, preprocessed = preprocess(source, False)
@@ -75,13 +75,13 @@ def main(args=None):
             return -1
 
         vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
-        if formats == "graphml":
-            graphml_format(vertices_list, save_path)
-        elif formats == "g6":
-            graph6_format(vertices_list, save_path)
-        else:
-            print("No Format found")
-            return -1
+        # if formats == "graphml":
+        #     graphml_format(vertices_list, save_path)
+        # elif formats == "g6":
+        #     graph6_format(vertices_list, save_path)
+        # else:
+        #     print("No Format found")
+        #     return -1
         cv.imshow("source", source)
         # display all windows until key is pressed
         cv.waitKey(0)
