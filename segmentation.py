@@ -85,9 +85,9 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     K = extreme(dst)
     kernel = np.ones((KERNEL_SIZE, KERNEL_SIZE), np.uint8)
     # eroding k times
-    eroded = cv.erode(image, kernel, iterations=K)
+    eroded = cv.erode(image, kernel, iterations=K - 4)
     # dilating k times
-    dilated = cv.dilate(eroded, kernel, iterations=K)
+    dilated = cv.dilate(eroded, kernel, iterations=K - 4)
     return dilated
 
 

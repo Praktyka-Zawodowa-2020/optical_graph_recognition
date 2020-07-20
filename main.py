@@ -23,28 +23,36 @@ def load_image(file_index):
         "article.png",
         "article_no_text.png"
     ]
-    source = cv.imread("./graphs/" + file_names[file_index])
-    # source = cv.imread("../../Praktyki2020/Resources/01.jpg")
+    # source = cv.imread("./graphs/" + file_names[file_index])
+    source = cv.imread("../../Praktyki2020/Resources/22.jpg")
     return source
 
 
 def main(args):
-    source = load_image(file_index=0)
+    #source = load_image(file_index=0)
+    for i in range(5,6):
 
-    if source is not None:  # read successful, process image
+        if i>=10:
+            src="../../Praktyki2020/Resources/"+str(i)+".jpg"
+        else:
+            src = "../../Praktyki2020/Resources/0" + str(i) + ".jpg"
+        print(src)
+        source=cv.imread(src)
 
-        source, binary, preprocessed = preprocess(source, True)
+        if source is not None:  # read successful, process image
 
-        vertices_list, visualised = segment(source, binary, preprocessed, True)
+            source, binary, preprocessed = preprocess(source, False, i)
 
-        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, True)
+            vertices_list, visualised = segment(source, binary, preprocessed, False)
 
-        cv.imshow("source", source)
-        # display all windows until key is pressed
-        cv.waitKey(0)
-    else:
-        print("Error opening image!")
-        return -1
+            vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
+
+            #cv.imshow("source", source)
+            # display all windows until key is pressed
+            cv.waitKey(0)
+        else:
+            print("Error opening image!")
+            return -1
 
 
 # if __name__ == "__main__":
