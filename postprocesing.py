@@ -2,13 +2,17 @@ from Vertex import Vertex
 from typing import List
 
 
-def graph6_format(vertex: List[Vertex]):
+def graph6_format(vertex: List[Vertex], save_path: str):
     """
     Saves the graph in .graph6 format
 
+    :param save_path: Folder path with the file name. No extension
     :param vertex: Lists of vertex
     :return:
     """
+
+    save_path = save_path + '.g6'
+    f = open(save_path, "wb")
     size = len(vertex)
     adjacency_matrix = [[0 for x in range(size)] for y in range(size)]
     adjacency_list = []
@@ -28,7 +32,6 @@ def graph6_format(vertex: List[Vertex]):
         while len(adjacency_list) % 6 != 0:
             adjacency_list.append(0)
 
-    f = open("graph.g6", "wb")
     if size < 63:
         f.write((size + 63).to_bytes(1, byteorder='big'))
     elif 63 <= size <= 258047:
@@ -52,14 +55,20 @@ def graph6_format(vertex: List[Vertex]):
     f.close()
 
 
-def graphml_format(vertex: List[Vertex]):
+def graphml_format(vertex: List[Vertex], save_path: str):
     """
     Saves the graph in .grapml format
 
+    :param save_path: Folder path with the file name. No extension
     :param vertex: Lists of vertex
     :return:
+
+    Args:
+
     """
-    f = open("graph.graphml", "w")
+
+    save_path = save_path + '.graphml'
+    f = open(save_path, "w")
     namespace = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' \
                 + '<graphml' \
                 + ' xmlns="http://graphml.graphdrawing.org/xmlns"' \
@@ -81,8 +90,6 @@ def graphml_format(vertex: List[Vertex]):
     f.write(key2)
     f.write(graph_node)
 
-    node_list = []
-    edge_list = []
     size = len(vertex)
     adjacency_matrix = [[0 for x in range(size)] for y in range(size)]
     for i in range(0, size):
