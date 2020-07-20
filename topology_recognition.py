@@ -16,6 +16,7 @@ def recognize_topology(vertices_list: list, preprocessed: np.ndarray, visualised
     """
     Remove vertices from image, and based on remaining contours detect edges that connect those vertices.
     Result of detection is a list of vertices with connection (neighbour) list for each vertex.
+
     :param vertices_list: list of detected vertices in segmentation phase
     :param preprocessed: image after preprocessing phase
     :param visualised: copy of source image with vertices drawn
@@ -38,6 +39,7 @@ def remove_vertices(vertices_list: list, preprocessed: np.ndarray, visualised: n
     """
     # Remove vertices areas from binary preprocessed image by setting those areas as background
     # Also mark areas for each vertex within which endpoints of edges will can be assigned to vertex
+
     :param vertices_list: list of detected vertices in segmentation phase
     :param preprocessed: image after preprocessing phase
     :param visualised: copy of source image with vertices drawn
@@ -59,6 +61,7 @@ def find_edges(vertices_list: list, preprocessed: np.ndarray, topology_backend: 
         -> (list, np.ndarray, np.ndarray):
     """
     Find vertices edges from contours.
+
     :param vertices_list: list of detected vertices in segmentation phase
     :param preprocessed: image after preprocessing phase
     :param topology_backend: source image with visualised vertices areas
@@ -101,6 +104,7 @@ def fit_line(edge_contour: list) -> ([float, float], [float, float]):
     Approximate edge contour with a straight line using contour operations.
     This is achieved by finding intersections of bounding rectangle and fitted line.
     x and y coordinates are calculated by solving system of linear equations that describe line and rectangle
+
     :param edge_contour: set of points that describe edge contour
     :return: two endpoints of an approximating line
     """
@@ -143,6 +147,7 @@ def fit_line(edge_contour: list) -> ([float, float], [float, float]):
 def find_nearest_vertex(point: np.ndarray, vertices_list: list) -> int:
     """
     Find vertex nearest to a given point (based on euclidean distance - L2)
+
     :param point: x and y coordinates from which distance to vertices is measured
     :param vertices_list: list of detected vertices in segmentation phase
     :return nearest_index: index in vertices list of vertex nearest to the given point
@@ -165,6 +170,7 @@ def find_nearest_vertex(point: np.ndarray, vertices_list: list) -> int:
 def point_within_radius(point: np.ndarray, vertex: Vertex, radius_factor: float) -> bool:
     """
     Check if point is within vertex area with radius modified by factor (based on euclidean distance - L2)
+
     :param point: x and y coordinates
     :param vertex: vertex which area is considered
     :param radius_factor: factor to increase/decrease radius and therefor area
