@@ -1,7 +1,7 @@
 """Module with operations that are used to preprocess a graph picture"""
 import cv2 as cv
 import numpy as np
-from shared import Kernel, Color
+from shared import Kernel, Color, Mode
 
 # constants:
 # for threshold function
@@ -14,6 +14,8 @@ HEIGHT_LIM: int = 800  # px
 # for threshold function
 MIN_BRIGHT_VAL: int = 110  # bright image lower limit of pixel value
 MAX_FILL_RATIO: float = 0.14  # ratio of object pixels to all pixels
+# for contour noise filtering
+NOISE_FACTOR: float = 0.0001  # px^2
 
 
 def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndarray, np.ndarray):
@@ -33,8 +35,8 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
     # Threshold (binarize) image
     binary, threshold_value = threshold(gray, MIN_BRIGHT_VAL, MAX_FILL_RATIO)
 
-    # Remove some holes from image with closing operator (first dilates and then erodes)
-    filtered = cv.morphologyEx(binary, cv.MORPH_CLOSE, Kernel.k3)
+    # Transform image (filter noise, remove grid, ...)
+    transformed = transform(binary, threshold_value, Mode.PRINTED)  # TODO - mode from command line
 
     # TODO - change parametrization of circles Transform in segmentation that works with this crop
     # Crop images to remove unnecessary background
@@ -48,16 +50,16 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
     if imshow_enabled:
         cv.imshow("reshaped source " + str(reshaped.shape[1]) + "x" + str(reshaped.shape[0]), reshaped)
         cv.imshow("binary, th=" + str(threshold_value), binary)
-        cv.imshow("filtered", filtered)
+        cv.imshow("transformed", transformed)
 
-    return reshaped, binary, filtered
+    return reshaped, binary, transformed
 
 
 def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
     """
     Scale image preserving original width to height ratio
     Do it so that its height and width are less or equal (and close to) given limits.
-    Also if image is oriented horizontally, orient it vertically. (TODO - is reshaping breaking OCR?)
+    Also if image is oriented horizontally, orient it vertically. (TODO - in final version remove rotation)
 
     :param image: input image
     :param width_lim: limit for width
@@ -97,7 +99,6 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
     # goal is to have white objects on black background
     # so if image is more bright perform inverse thresholding
     # and if image is more dark perform normal thresholding
-    print(str(np.average(gray_image)))
     if np.average(gray_image) >= min_bright_value:  # bright image
         thresh_type = cv.THRESH_BINARY_INV
         sub_sign = 1    # for bright image we want to subtract constant value in adaptive thresholding
@@ -117,6 +118,151 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
         binary = cv.adaptiveThreshold(gray_image, Color.OBJECT, cv.ADAPTIVE_THRESH_GAUSSIAN_C, thresh_type, 51, sub_sign*8)
 
     return binary, threshold_value
+
+
+def transform(binary_image: np.ndarray, thresh_val: int, mode: Mode) -> np.ndarray:
+    if mode == Mode.GRID_BG:
+        if thresh_val != GLOBAL_THRESH_FAILED:
+            transformed = filter_grid(binary_image, 40, 3, NOISE_FACTOR)
+        else:
+            transformed = filter_grid(binary_image, 30, 3, NOISE_FACTOR)
+    elif mode == Mode.CLEAN_BG:
+        transformed = cv.medianBlur(binary_image, 3)
+        transformed = remove_contour_noise(transformed, NOISE_FACTOR/2.0)
+        if thresh_val == GLOBAL_THRESH_FAILED:
+            transformed = cv.morphologyEx(transformed, cv.MORPH_CLOSE, Kernel.k5)
+    elif mode == Mode.PRINTED:
+        transformed = cv.medianBlur(binary_image, 3)
+        transformed = remove_contour_noise(transformed, NOISE_FACTOR/4.0)
+    else:
+        print("Mode is not supported!")
+        transformed = np.copy(binary_image)
+    return transformed
+
+
+def remove_contour_noise(image: np.ndarray, max_noise_factor: float) -> np.ndarray:
+    """
+    Remove small closed contours from the image, that can be considered as a noise.
+    Designed mainly to remove small dots that remain after removing the grid from the image.
+
+    :param image: binary image
+    :param max_noise_factor: factor to take part of image area as upper limit for noise area
+    :return: Image with noise filtered out
+    """
+    contours, _ = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+
+    for i in range(0, len(contours)):
+
+        if cv.contourArea(contours[i]) <= image.shape[0]*image.shape[1]*max_noise_factor:
+            # fill contour area with background color
+            cv.drawContours(image, contours, contourIdx=i, color=0, thickness=cv.FILLED)
+
+    return image
+
+
+def filter_grid(binary_image: np.ndarray, min_distance: int, start_kernel: int, max_noise_factor: float) -> np.ndarray:
+    binary = np.copy(binary_image)
+    avg = avg_bg_distance(binary)
+    if avg < min_distance:
+        for i in range(0, 3):
+            if avg < min_distance:
+                image = cv.medianBlur(binary, start_kernel + i * 2)
+                image = remove_contour_noise(image, max_noise_factor)
+            else:
+                break
+
+            avg = avg_bg_distance(image)
+    else:
+        image = remove_contour_noise(binary, max_noise_factor)
+    # remove remaining straight lines that go across whole image
+    horizontal = remove_horizontal_grid(image)
+    vertical = remove_vertical_grid(image)
+    image = cv.bitwise_and(horizontal, vertical)
+
+    return image
+
+
+def avg_bg_distance(binary_image: np.ndarray) -> float:
+    negative = cv.bitwise_not(binary_image)
+    distance = cv.distanceTransform(negative, cv.DIST_L2, 3)
+    width = distance.shape[1]
+    height = distance.shape[0]
+    mid_width = int(width / 2)
+    mid_height = int(height / 2)
+    avgs = [
+        np.average(distance[0: mid_height, 0:mid_width]),
+        np.average(distance[0:mid_height, mid_width:width]),
+        np.average(distance[mid_height:height, 0:mid_width]),
+        np.average(distance[mid_height:height, mid_width:width])
+    ]
+    return np.min(avgs)
+
+
+def remove_horizontal_grid(binary_image: np.ndarray) -> np.ndarray:
+    width = binary_image.shape[1]
+    structure = cv.getStructuringElement(cv.MORPH_RECT, (width // 50, 1))
+    horizontal = cv.erode(binary_image, structure)
+    horizontal = cv.dilate(horizontal, structure)
+    horizontal = cv.dilate(horizontal, Kernel.k3, iterations=1)
+
+    lines = cv.HoughLines(horizontal, 1, np.pi / 180, 500)
+    horizontal_mask = np.zeros((horizontal.shape[0], horizontal.shape[1]), np.uint8)
+    if lines is not None:
+        for line in lines:
+            rho, theta = line[0]
+            a = np.cos(theta)
+            b = np.sin(theta)
+            x0 = a * rho
+            y0 = b * rho
+            x1 = int(x0 + 1500 * (-b))
+            y1 = int(y0 + 1500 * (a))
+            x2 = int(x0 - 1500 * (-b))
+            y2 = int(y0 - 1500 * (a))
+            cv.line(horizontal_mask, (x1, y1), (x2, y2), 255, 7)
+    masked = cv.bitwise_and(horizontal, horizontal_mask)
+    masked = cv.erode(masked, Kernel.k3, iterations=1)
+    lines = cv.HoughLinesP(masked, 1, np.pi / 180, threshold=20, minLineLength=width // 25, maxLineGap=10)
+    image = np.copy(binary_image)
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            cv.line(image, (x1, y1), (x2, y2), 0, 2)
+
+    return image
+
+
+def remove_vertical_grid(binary_image: np.ndarray) -> np.ndarray:
+
+    height = binary_image.shape[0]
+    structure = cv.getStructuringElement(cv.MORPH_RECT, (1, height//50))
+    vertical = cv.erode(binary_image, structure)
+    vertical = cv.dilate(vertical, structure)
+
+    vertical = cv.dilate(vertical, Kernel.k3, iterations=1)
+    lines = cv.HoughLines(vertical, 1, np.pi/180, 400)
+    vertical_mask = np.zeros((vertical.shape[0], vertical.shape[1]), np.uint8)
+    if lines is not None:
+        for line in lines:
+            rho, theta = line[0]
+            a = np.cos(theta)
+            b = np.sin(theta)
+            x0 = a * rho
+            y0 = b * rho
+            x1 = int(x0 + 1500 * (-b))
+            y1 = int(y0 + 1500 * (a))
+            x2 = int(x0 - 1500 * (-b))
+            y2 = int(y0 - 1500 * (a))
+            cv.line(vertical_mask, (x1, y1), (x2, y2), 255, 7)
+    masked = cv.bitwise_and(vertical, vertical_mask)
+    masked = cv.erode(masked, Kernel.k3, iterations=1)
+    lines = cv.HoughLinesP(masked, 1, np.pi / 180, threshold=30, minLineLength=height // 25, maxLineGap=10)
+    image = np.copy(binary_image)
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            cv.line(image, (x1, y1), (x2, y2), 0, 2)
+
+    return image
 
 
 def delete_characters(image: np.ndarray) -> np.ndarray:
