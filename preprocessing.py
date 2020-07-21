@@ -1,6 +1,7 @@
 """Module with operations that are used to preprocess a graph picture"""
 import cv2 as cv
 import numpy as np
+from shared import Kernel, Color
 
 # constants:
 # for threshold function
@@ -33,8 +34,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
     binary, threshold_value = threshold(gray, MIN_BRIGHT_VAL, MAX_FILL_RATIO)
 
     # Remove some holes from image with closing operator (first dilates and then erodes)
-    kernel = np.ones((5, 5), np.uint8)
-    filtered = cv.morphologyEx(binary, cv.MORPH_CLOSE, kernel)
+    filtered = cv.morphologyEx(binary, cv.MORPH_CLOSE, Kernel.k3)
 
     # TODO - change parametrization of circles Transform in segmentation that works with this crop
     # Crop images to remove unnecessary background
@@ -99,14 +99,14 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
     # and if image is more dark perform normal thresholding
     print(str(np.average(gray_image)))
     if np.average(gray_image) >= min_bright_value:  # bright image
-        threshold_type = cv.THRESH_BINARY_INV
+        thresh_type = cv.THRESH_BINARY_INV
         sub_sign = 1    # for bright image we want to subtract constant value in adaptive thresholding
     else:   # dark image
-        threshold_type = cv.THRESH_BINARY
+        thresh_type = cv.THRESH_BINARY
         sub_sign = -1    # for bright image we want to add (subtract negative) constant value in adaptive thresholding
 
     # Perform adaptive global thresholding (OTSU)
-    threshold_value, binary = cv.threshold(gray_image, 0, 255, threshold_type + cv.THRESH_OTSU)
+    threshold_value, binary = cv.threshold(gray_image, 0, Color.OBJECT, thresh_type + cv.THRESH_OTSU)
 
     # Calculate fill ratio - number of object pixels (255, white) divided by number of all pixel (height * width)
     fill_ratio = np.count_nonzero(binary)/(binary.shape[0]*binary.shape[1])
@@ -114,7 +114,7 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
     # global OTSU thresholding failed if resulted in to many object pixels
     if fill_ratio > max_fill_ratio:        # if it failed apply local adaptive thresholding
         threshold_value = GLOBAL_THRESH_FAILED
-        binary = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, threshold_type, 51, sub_sign*8)
+        binary = cv.adaptiveThreshold(gray_image, Color.OBJECT, cv.ADAPTIVE_THRESH_GAUSSIAN_C, thresh_type, 51, sub_sign*8)
 
     return binary, threshold_value
 
