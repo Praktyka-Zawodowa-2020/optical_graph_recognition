@@ -132,7 +132,6 @@ def delete_characters(image: np.ndarray, binary: np.ndarray, i) -> np.ndarray:
     :param image: Image after binarization
     :return: Image without noise
     """
-    kernel = np.ones((3, 3), np.uint8)
     print("obraz ", i)
     if not os.path.exists("./testCountour/"+str(i)):
         os.mkdir("./testCountour/"+str(i))
@@ -140,28 +139,31 @@ def delete_characters(image: np.ndarray, binary: np.ndarray, i) -> np.ndarray:
         os.mkdir("./testCountour/" + str(i)+"/przetwarzane")
     if not os.path.exists("./testCountour/" + str(i) + "/nieprzetwarzane"):
         os.mkdir("./testCountour/" + str(i) + "/nieprzetwarzane")
-    width, height = image.shape[:2]
-
+    height, width = image.shape[:2]
+    print(width,height)
     # findContours returns 3 variables for getting contours
-    contours, hierarchy = cv.findContours(binary, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    eroded=cv.erode(binary, Kernel.k3, iterations=1)
+    contours, hierarchy = cv.findContours(eroded, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
     k = 0
     for contour in contours:
         # get rectangle bounding contour
         [x, y, w, h] = cv.boundingRect(contour)
         if 5 < w < 70 and 5 < h < 70:
-            if 1 < x and x + w + 4 < width and 1 < y and y + h + 4 < height:
+            #print(x,y,x+w,y+h,end="")
+            if 1 < x and (x + w + 4) < width and 1 < y and (y + h + 4) < height:
                 x = x - 2
                 y = y - 2
                 w = w + 4
                 h = h + 4
             crop_image = binary[y: y + h, x: x + w].copy()
-
+            #print("   ",x, y,x+ w,y+ h)
             letter = []
             cv.rectangle(crop_image, (0, 0), (w - 1, h - 1), 0, 1)
-            eroded = cv.erode(crop_image, kernel, iterations=1)
+            eroded = cv.erode(crop_image, Kernel.k3, iterations=1)
             hist = cv.calcHist([eroded], [0], None, [256], [0, 256])
             if hist[255] / (hist[255] + hist[0]) > 0.005:
-                letter = pytesseract.image_to_string(crop_image, config="--psm 10")
+                configuration = '--psm 10 --dpi ' + str(w*h)
+                letter = pytesseract.image_to_string(crop_image, config=configuration)
                 letter = re.findall('\w', letter)
 
             if len(letter) > 0:
