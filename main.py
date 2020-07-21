@@ -3,10 +3,10 @@ import sys
 
 import cv2 as cv
 import argparse
-from postprocesing import graph6_format, graphml_format
 from preprocessing import preprocess
 from segmentation import segment
 from topology_recognition import recognize_topology
+from postprocesing import graph6_format, graphml_format
 
 parser = argparse.ArgumentParser("Optical graph recognition")
 parser.add_argument("-p", "--path", help="Path to file")
@@ -75,6 +75,7 @@ def main(args=None):
             return -1
 
         vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
+
         if formats == "graphml":
             graphml_format(vertices_list, save_path)
         elif formats == "g6":
@@ -82,7 +83,7 @@ def main(args=None):
         else:
             print("No Format found")
             return -1
-        cv.imshow("source", source)
+
         # display all windows until key is pressed
         cv.waitKey(0)
     else:
@@ -90,5 +91,5 @@ def main(args=None):
         return -1
 
 
-# if __name__ == "__main__":
-main()
+if __name__ == "__main__":
+    main()
