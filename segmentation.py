@@ -6,6 +6,8 @@ from math import ceil, floor, sqrt
 from Vertex import Vertex
 from chamford import extreme
 # Below are constants for HoughCircles function
+from shared import Color, Kernel
+
 MAX_R_FACTOR: float = 0.035
 MIN_R_FACTOR: float = 0.005
 DIST_FACTOR: float = 0.06
@@ -13,8 +15,6 @@ INNER_CANNY: int = 200
 CIRCLE_THRESHOLD: int = 13
 
 # Below are other constants
-K: int = 4  # Consider 2 or 3 for lower and bigger K for higher resolutions
-KERNEL_SIZE: int = 3  # Must be an odd number
 COLOR_R_FACTOR: float = 0.5  # Should be < 1.0
 
 
@@ -69,10 +69,10 @@ def fill_vertices(image: np.ndarray) -> np.ndarray:
         for i in circles[0, :]:
             center = (i[0], i[1])
             radius = i[2]
-            cv.circle(image, center, round(radius), 255, thickness=cv.FILLED, lineType=8, shift=0)
+            cv.circle(image, center, round(radius), Color.OBJECT, thickness=cv.FILLED, lineType=8, shift=0)
 
     # Vertices are not perfect circles so after circle fill we fill small gaps inside vertices with closing operation
-    image = cv.morphologyEx(image, cv.MORPH_CLOSE, np.ones((7, 7), np.uint8))
+    image = cv.morphologyEx(image, cv.MORPH_CLOSE, Kernel.k7)
 
     return image
 
@@ -85,8 +85,8 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     :return dilated: image without edges (only vertices pixels)
     """
     dst = cv.distanceTransform(image, cv.DIST_C, 3)
-    K = extreme(dst)
-    kernel = np.ones((KERNEL_SIZE, KERNEL_SIZE), np.uint8)
+    k = extreme(dst)
+    kernel = Kernel.k3
     # eroding k times
     eroded = cv.erode(image, kernel, iterations=K)
     # dilating k times
@@ -127,9 +127,9 @@ def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) 
         vertices_list.append(Vertex(x, y, r_original, color))
 
         # creating visual representation of detected vertices
-        thickness = cv.FILLED if color == 255 else 2
-        cv.circle(visualized, (x, y), r_final, (0, 255, 0), thickness, 8, 0)
-        # cv.putText(visualized, str(i), (x, y), cv.QT_FONT_NORMAL, 0.75, (255, 255, 255))
+        thickness = cv.FILLED if color == Color.OBJECT else 2
+        cv.circle(visualized, (x, y), r_final, Color.GREEN, thickness, 8, 0)
+        # cv.putText(visualized, str(i), (x, y), cv.QT_FONT_NORMAL, 0.75, Color.WHITE)
 
     return vertices_list, visualized
 
@@ -154,17 +154,17 @@ def determine_binary_color(binary: np.ndarray, x: int, y: int, r_original: float
         right = x + r if ((x + r) <= binary.shape[1]) else binary.shape[1]
 
         # in inner circle area count black and white pixels to find dominant color
-        white_count = 0
-        black_count = 0
+        object_count = 0
+        bg_count = 0
         for y_iter in range(top, bottom):
             for x_iter in range(left, right):
                 distance = round(sqrt((x-x_iter)**2+(y-y_iter)**2))
                 if distance <= r:
-                    if binary[y_iter, x_iter] == 255:
-                        white_count += 1
+                    if binary[y_iter, x_iter] == Color.OBJECT:
+                        object_count += 1
                     else:
-                        black_count += 1
+                        bg_count += 1
 
-        return 255 if white_count > black_count else 0
+        return Color.OBJECT if object_count >= bg_count else Color.BG
     else:  # bad input
         return -1

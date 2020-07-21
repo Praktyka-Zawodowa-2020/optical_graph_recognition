@@ -4,6 +4,7 @@ import numpy as np
 import math
 
 from Vertex import Vertex
+from shared import Color
 
 # constants
 MIN_EDGE_LEN: int = 10  # px
@@ -50,10 +51,10 @@ def remove_vertices(vertices_list: list, preprocessed: np.ndarray, visualised: n
         # remove vertices
         cv.circle(
             preprocessed, (vrtx.x, vrtx.y), round(vrtx.r * VERTEX_AREA_FACTOR),
-            color=0, thickness=cv.FILLED, lineType=8
+            color=Color.BG, thickness=cv.FILLED, lineType=8
         )
         # visualise "within area"
-        cv.circle(within_areas, (vrtx.x, vrtx.y), round(vrtx.r * WITHIN_R_FACTOR), (255, 0, 0), thickness=cv.FILLED)
+        cv.circle(within_areas, (vrtx.x, vrtx.y), round(vrtx.r * WITHIN_R_FACTOR), Color.BLUE, thickness=cv.FILLED)
     return preprocessed, within_areas
 
 
@@ -70,13 +71,13 @@ def find_edges(vertices_list: list, preprocessed: np.ndarray, topology_backend: 
     image with visualised intermediate recognition steps and shapes, image with visualised final topology
     """
     contours, _ = cv.findContours(preprocessed, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    cv.drawContours(topology_backend, contours, -1, (0, 255, 255), 1)
+    cv.drawContours(topology_backend, contours, -1, Color.YELLOW, 1)
     for cnt in contours:
         pt1, pt2 = fit_line(cnt)
         if np.linalg.norm(pt1 - pt2) > MIN_EDGE_LEN:    # considering lines that are long enough to be an edge
             cv.line(
                 topology_backend, (round(pt1[0]), round(pt1[1])), (round(pt2[0]), round(pt2[1])),
-                (0, 140, 255), thickness=3
+                Color.ORANGE, thickness=3
             )
             index1 = find_nearest_vertex(pt1, vertices_list)
             vertex1 = vertices_list[index1]
@@ -92,9 +93,9 @@ def find_edges(vertices_list: list, preprocessed: np.ndarray, topology_backend: 
                     and index2 not in vertex1.neighbour_list and index1 not in vertex2.neighbour_list:
                 vertex1.neighbour_list.append(index2)
                 vertex2.neighbour_list.append(index1)
-                cv.line(visualised, (vertex1.x, vertex1.y), (vertex2.x, vertex2.y), (0, 0, 255), thickness=2)
-                cv.circle(visualised, (vertex1.x, vertex1.y), 4, (0, 0, 0), thickness=cv.FILLED, lineType=8)
-                cv.circle(visualised, (vertex2.x, vertex2.y), 4, (0, 0, 0), thickness=cv.FILLED, lineType=8)
+                cv.line(visualised, (vertex1.x, vertex1.y), (vertex2.x, vertex2.y), Color.RED, thickness=2)
+                cv.circle(visualised, (vertex1.x, vertex1.y), 4, Color.BLACK, thickness=cv.FILLED, lineType=8)
+                cv.circle(visualised, (vertex2.x, vertex2.y), 4, Color.BLACK, thickness=cv.FILLED, lineType=8)
 
     return vertices_list, topology_backend, visualised
 
