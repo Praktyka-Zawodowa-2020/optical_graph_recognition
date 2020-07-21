@@ -85,7 +85,7 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     :return dilated: image without edges (only vertices pixels)
     """
     dst = cv.distanceTransform(image, cv.DIST_C, 3)
-    k = extreme(dst)
+    K = extreme(dst)
     kernel = Kernel.k3
     # eroding k times
     eroded = cv.erode(image, kernel, iterations=k)
