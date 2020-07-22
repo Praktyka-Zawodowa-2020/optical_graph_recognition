@@ -20,31 +20,26 @@ NOISE_FACTOR: float = 0.0001  # px^2
 
 def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndarray, np.ndarray):
     """
-    Processes source image by reshaping, thresholding and noise filering.
+    Processes source image by reshaping, thresholding, transforming and cropping.
 
     :param source: input image
     :param imshow_enabled: flag determining to display (or not) preprocessing steps
-    :return: reshaped, binarized, and filtered images.
+    :return: reshaped, binarized, and fully preprocessed images.
     """
-    # reshape to standard orientation, and resolution
+    # Reshape image to standard resolution
     reshaped = reshape(source, WIDTH_LIM, HEIGHT_LIM)
 
-    # converting image to gray scale
+    # Convert image to gray scale
     gray = cv.cvtColor(reshaped, cv.COLOR_BGR2GRAY)
 
     # Threshold (binarize) image
     binary, threshold_value = threshold(gray, MIN_BRIGHT_VAL, MAX_FILL_RATIO)
 
     # Transform image (filter noise, remove grid, ...)
-    transformed = transform(binary, threshold_value, Mode.PRINTED)  # TODO - mode from command line
+    transformed = transform(binary, threshold_value, Mode.CLEAN_BG)  # TODO - mode from command line
 
-    # TODO - change parametrization of circles Transform in segmentation that works with this crop
-    # Crop images to remove unnecessary background
-    # object_pixels = cv.findNonZero(filtered)
-    # x, y, w, h = cv.boundingRect(object_pixels)
-    # source = source[y:y+h, x:x+w]
-    # binary = binary[y:y+h, x:x+w]
-    # filtered = filtered[y:y+h, x:x+w]
+    # Remove unnecessary background
+    transformed, [reshaped, binary] = crop_bg_padding(transformed, [reshaped, binary])
 
     # Display results of preprocessing steps
     if imshow_enabled:
@@ -230,6 +225,7 @@ def avg_bg_distance(binary_image: np.ndarray) -> float:
     return np.min(averages)
 
 
+# TODO - change grid function with HoughLines to only remove margins
 def remove_horizontal_grid(binary_image: np.ndarray) -> np.ndarray:
     """
     Remove horizontal grid lines (long lines that go across image y axis)
@@ -314,6 +310,29 @@ def remove_vertical_grid(binary_image: np.ndarray) -> np.ndarray:
             cv.line(image, (x1, y1), (x2, y2), 0, 2)
 
     return image
+
+
+def crop_bg_padding(binary_transformed: np.ndarray, images: list) -> (np.ndarray, list):
+    """
+    Crop images to remove background padding (unnecessary background surrounding graph)
+
+    :param binary_transformed: binarized and transformed (noise filtered) input image
+    :param images: all other images
+    :return: cropped images in the same order as in input - separately: transformed, and all other in list
+    """
+    # Find all object pixels in transformed image
+    object_pixels = cv.findNonZero(binary_transformed)
+    # Find minimal rectangular area in transformed image, that includes all object pixels - area without padding
+    left, top, width, height = cv.boundingRect(object_pixels)
+    right = left + width
+    bottom = top + height
+
+    # Crop all given images to new minimal size - removes padding
+    binary_transformed = binary_transformed[top:bottom, left:right]
+    if images is not None:
+        for i in range(0, len(images)):
+            images[i] = images[i][top:bottom, left:right]
+    return binary_transformed, images
 
 
 def delete_characters(image: np.ndarray) -> np.ndarray:
