@@ -4,9 +4,14 @@ import numpy as np
 import pytesseract
 import re
 import os
+from math import ceil, floor, sqrt
 from shared import Kernel, Color, Mode
 
-
+MAX_R_FACTOR: float = 0.035
+MIN_R_FACTOR: float = 0.005
+DIST_FACTOR: float = 0.06
+INNER_CANNY: int = 200
+CIRCLE_THRESHOLD: int = 13
 # constants:
 # for threshold function
 GLOBAL_THRESH_FAILED = -1
@@ -24,7 +29,7 @@ NOISE_FACTOR: float = 0.0001  # px^2
 pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe'
 
 
-def preprocess(source: np.ndarray, imshow_enabled: bool,i,file_name) -> (np.ndarray, np.ndarray, np.ndarray):
+def preprocess(source: np.ndarray, imshow_enabled: bool, i, file_name) -> (np.ndarray, np.ndarray, np.ndarray):
     """
     Processes source image by reshaping, thresholding and noise filering.
 
@@ -44,7 +49,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool,i,file_name) -> (np.ndar
     # Transform image (filter noise, remove grid, ...)
     transformed = transform(binary, threshold_value, Mode.PRINTED)  # TODO - mode from command line
 
-    delete_characters(transformed, binary,i)
+    delete_characters(transformed, reshaped, i)
     # TODO - change parametrization of circles Transform in segmentation that works with this crop
     # Crop images to remove unnecessary background
     # object_pixels = cv.findNonZero(filtered)
@@ -108,11 +113,10 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
     # and if image is more dark perform normal thresholding
     if np.average(gray_image) >= min_bright_value:  # bright image
         thresh_type = cv.THRESH_BINARY_INV
-        sub_sign = 1    # for bright image we want to subtract constant value in adaptive thresholding
-    else:   # dark image
+        sub_sign = 1  # for bright image we want to subtract constant value in adaptive thresholding
+    else:  # dark image
         thresh_type = cv.THRESH_BINARY
-        sub_sign = -1    # for bright image we want to add (subtract negative) constant value in adaptive thresholding
-
+        sub_sign = -1  # for bright image we want to add (subtract negative) constant value in adaptive thresholding
 
     # Perform adaptive global thresholding (OTSU)
     threshold_value, binary = cv.threshold(gray_image, 0, Color.OBJECT, thresh_type + cv.THRESH_OTSU)
@@ -123,7 +127,8 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
     # global OTSU thresholding failed if resulted in to many object pixels
     if fill_ratio > max_fill_ratio:  # if it failed apply local adaptive thresholding
         threshold_value = GLOBAL_THRESH_FAILED
-        binary = cv.adaptiveThreshold(gray_image, Color.OBJECT, cv.ADAPTIVE_THRESH_GAUSSIAN_C, thresh_type, 51, sub_sign*8)
+        binary = cv.adaptiveThreshold(gray_image, Color.OBJECT, cv.ADAPTIVE_THRESH_GAUSSIAN_C, thresh_type, 51,
+                                      sub_sign * 8)
 
     return binary, threshold_value
 
@@ -136,12 +141,12 @@ def transform(binary_image: np.ndarray, thresh_val: int, mode: Mode) -> np.ndarr
             transformed = filter_grid(binary_image, 30, 3, NOISE_FACTOR)
     elif mode == Mode.CLEAN_BG:
         transformed = cv.medianBlur(binary_image, 3)
-        transformed = remove_contour_noise(transformed, NOISE_FACTOR/2.0)
+        transformed = remove_contour_noise(transformed, NOISE_FACTOR / 2.0)
         if thresh_val == GLOBAL_THRESH_FAILED:
             transformed = cv.morphologyEx(transformed, cv.MORPH_CLOSE, Kernel.k5)
     elif mode == Mode.PRINTED:
         transformed = cv.medianBlur(binary_image, 3)
-        transformed = remove_contour_noise(transformed, NOISE_FACTOR/4.0)
+        transformed = remove_contour_noise(transformed, NOISE_FACTOR / 4.0)
     else:
         print("Mode is not supported!")
         transformed = np.copy(binary_image)
@@ -161,7 +166,7 @@ def remove_contour_noise(image: np.ndarray, max_noise_factor: float) -> np.ndarr
 
     for i in range(0, len(contours)):
 
-        if cv.contourArea(contours[i]) <= image.shape[0]*image.shape[1]*max_noise_factor:
+        if cv.contourArea(contours[i]) <= image.shape[0] * image.shape[1] * max_noise_factor:
             # fill contour area with background color
             cv.drawContours(image, contours, contourIdx=i, color=0, thickness=cv.FILLED)
 
@@ -240,14 +245,13 @@ def remove_horizontal_grid(binary_image: np.ndarray) -> np.ndarray:
 
 
 def remove_vertical_grid(binary_image: np.ndarray) -> np.ndarray:
-
     height = binary_image.shape[0]
-    structure = cv.getStructuringElement(cv.MORPH_RECT, (1, height//50))
+    structure = cv.getStructuringElement(cv.MORPH_RECT, (1, height // 50))
     vertical = cv.erode(binary_image, structure)
     vertical = cv.dilate(vertical, structure)
 
     vertical = cv.dilate(vertical, Kernel.k3, iterations=1)
-    lines = cv.HoughLines(vertical, 1, np.pi/180, 400)
+    lines = cv.HoughLines(vertical, 1, np.pi / 180, 400)
     vertical_mask = np.zeros((vertical.shape[0], vertical.shape[1]), np.uint8)
     if lines is not None:
         for line in lines:
@@ -273,7 +277,7 @@ def remove_vertical_grid(binary_image: np.ndarray) -> np.ndarray:
     return image
 
 
-def delete_characters(image: np.ndarray, binary: np.ndarray, i) -> np.ndarray:
+def delete_characters(image: np.ndarray, source: np.ndarray, i) -> np.ndarray:
     """
     Remove "characters" (noise) of small sizes
 
@@ -281,51 +285,55 @@ def delete_characters(image: np.ndarray, binary: np.ndarray, i) -> np.ndarray:
     :return: Image without noise
     """
     print("obraz ", i)
-    if not os.path.exists("./testCountour/"+str(i)):
-        os.mkdir("./testCountour/"+str(i))
+    if not os.path.exists("./testCountour/" + str(i)):
+        os.mkdir("./testCountour/" + str(i))
     if not os.path.exists("./testCountour/" + str(i) + "/przetwarzane"):
-        os.mkdir("./testCountour/" + str(i)+"/przetwarzane")
+        os.mkdir("./testCountour/" + str(i) + "/przetwarzane")
     if not os.path.exists("./testCountour/" + str(i) + "/nieprzetwarzane"):
         os.mkdir("./testCountour/" + str(i) + "/nieprzetwarzane")
     height, width = image.shape[:2]
-    print(width,height)
+    print(width, height)
     # findContours returns 3 variables for getting contours
-    eroded=cv.erode(binary, Kernel.k3, iterations=1)
-    contours, hierarchy = cv.findContours(eroded, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    cv.imwrite("testCountour/" + str(i) + "/before.jpg", image)
+    canny = source.copy()
+    contours, hierarchy = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
     k = 0
     for contour in contours:
         # get rectangle bounding contour
         [x, y, w, h] = cv.boundingRect(contour)
+
         if 5 < w < 70 and 5 < h < 70:
-            #print(x,y,x+w,y+h,end="")
+            # print(x,y,x+w,y+h,end="")
+            cv.rectangle(source, (x, y), (x + w, y + h), (0, 255, 0), 1)
             if 1 < x and (x + w + 4) < width and 1 < y and (y + h + 4) < height:
                 x = x - 2
                 y = y - 2
                 w = w + 4
                 h = h + 4
-            crop_image = binary[y: y + h, x: x + w].copy()
-            #print("   ",x, y,x+ w,y+ h)
+            crop_image = image[y: y + h, x: x + w].copy()
+            dst = cv.distanceTransform(crop_image, cv.DIST_C, 3,cv.DIST_LABEL_PIXEL)
+            # print("   ",x, y,x+ w,y+ h)
             letter = []
             cv.rectangle(crop_image, (0, 0), (w - 1, h - 1), 0, 1)
             eroded = cv.erode(crop_image, Kernel.k3, iterations=1)
             hist = cv.calcHist([eroded], [0], None, [256], [0, 256])
             if hist[255] / (hist[255] + hist[0]) > 0.005:
-                configuration = '--psm 10 --dpi ' + str(w*h)
+                configuration = '--psm 10 --dpi ' + str(w * h)
                 letter = pytesseract.image_to_string(crop_image, config=configuration)
                 letter = re.findall('\w', letter)
 
             if len(letter) > 0:
-                if letter[0] != '0' and letter[0] != 'O' and letter[0] != 'o' and letter[0] != 'Q':
+                if letter[0] != '0' and letter[0] != 'O' and letter[0] != 'o' and letter[0] != 'Q' and letter[0] != 'C':
                     cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
 
             if hist[255] / (hist[255] + hist[0]) > 0.005:
                 cv.imwrite("testCountour/" + str(i) + "/przetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
-                hist[255] / (hist[255] + hist[0])) + ".jpg", crop_image)
+                    hist[255] / (hist[255] + hist[0])) + ".jpg", crop_image)
             else:
                 cv.imwrite("testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
                     hist[255] / (hist[255] + hist[0])) + ".jpg", crop_image)
             k += 1
 
-    cv.imwrite("testCountour/" + str(i) + "/binary.jpg", binary)
-    cv.imwrite("testCountour/" + str(i) + "/delete.jpg", image)
+    cv.imwrite("testCountour/" + str(i) + "/canny.jpg", source)
+    cv.imwrite("testCountour/" + str(i) + "/after.jpg", image)
     return image
