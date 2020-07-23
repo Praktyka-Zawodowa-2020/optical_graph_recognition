@@ -1,8 +1,14 @@
 """Module with operations that are used to preprocess a graph picture"""
 import cv2 as cv
 import numpy as np
+import math
 from shared import Kernel, Color, Mode
 
+MAX_R_FACTOR: float = 0.035
+MIN_R_FACTOR: float = 0.005
+DIST_FACTOR: float = 0.06
+INNER_CANNY: int = 200
+CIRCLE_THRESHOLD: int = 13
 # constants:
 # for threshold function
 GLOBAL_THRESH_FAILED = -1
@@ -41,11 +47,15 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
     # Remove unnecessary background
     transformed, [reshaped, binary] = crop_bg_padding(transformed, [reshaped, binary])
 
+    # Remove characters
+    without_chars = delete_characters(transformed)
+
     # Display results of preprocessing steps
     if imshow_enabled:
         cv.imshow("reshaped source " + str(reshaped.shape[1]) + "x" + str(reshaped.shape[0]), reshaped)
         cv.imshow("binary, th=" + str(threshold_value), binary)
         cv.imshow("transformed", transformed)
+        cv.imshow("Chars deleted", without_chars)
 
     return reshaped, binary, transformed
 
@@ -63,7 +73,7 @@ def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
     """
     img_width = image.shape[1]
     img_height = image.shape[0]
-    if img_height > img_width:      # If image is oriented horizontally - rotate to orient vertically
+    if img_height > img_width:  # If image is oriented horizontally - rotate to orient vertically
         image = cv.rotate(image, cv.ROTATE_90_CLOCKWISE)
         # image size changed after rotation, we only need new width
         img_width = image.shape[1]
@@ -71,8 +81,8 @@ def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
     width_factor = width_lim / img_width
     image = cv.resize(image, (0, 0), fx=width_factor, fy=width_factor)
 
-    img_height = image.shape[0]     # Image height changed after rotation and first scaling
-    if img_height > height_lim:     # scale again if new height is still too large
+    img_height = image.shape[0]  # Image height changed after rotation and first scaling
+    if img_height > height_lim:  # scale again if new height is still too large
         height_factor = height_lim / img_height
         image = cv.resize(image, (0, 0), fx=height_factor, fy=height_factor)
 
@@ -96,21 +106,22 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
     # and if image is more dark perform normal thresholding
     if np.average(gray_image) >= min_bright_value:  # bright image
         thresh_type = cv.THRESH_BINARY_INV
-        sub_sign = 1    # for bright image we want to subtract constant value in adaptive thresholding
-    else:   # dark image
+        sub_sign = 1  # for bright image we want to subtract constant value in adaptive thresholding
+    else:  # dark image
         thresh_type = cv.THRESH_BINARY
-        sub_sign = -1    # for bright image we want to add (subtract negative) constant value in adaptive thresholding
+        sub_sign = -1  # for bright image we want to add (subtract negative) constant value in adaptive thresholding
 
     # Perform adaptive global thresholding (OTSU)
     threshold_value, binary = cv.threshold(gray_image, 0, Color.OBJECT, thresh_type + cv.THRESH_OTSU)
 
     # Calculate fill ratio - number of object pixels (255, white) divided by number of all pixel (height * width)
-    fill_ratio = np.count_nonzero(binary)/(binary.shape[0]*binary.shape[1])
+    fill_ratio = np.count_nonzero(binary) / (binary.shape[0] * binary.shape[1])
 
     # global OTSU thresholding failed if resulted in to many object pixels
-    if fill_ratio > max_fill_ratio:        # if it failed apply local adaptive thresholding
+    if fill_ratio > max_fill_ratio:  # if it failed apply local adaptive thresholding
         threshold_value = GLOBAL_THRESH_FAILED
-        binary = cv.adaptiveThreshold(gray_image, Color.OBJECT, cv.ADAPTIVE_THRESH_GAUSSIAN_C, thresh_type, 51, sub_sign*8)
+        binary = cv.adaptiveThreshold(gray_image, Color.OBJECT, cv.ADAPTIVE_THRESH_GAUSSIAN_C, thresh_type, 51,
+                                      sub_sign * 8)
 
     return binary, threshold_value
 
@@ -131,12 +142,13 @@ def transform(binary_image: np.ndarray, thresh_val: int, mode: Mode) -> np.ndarr
             transformed = filter_grid(binary_image, 30, 3, NOISE_FACTOR)
     elif mode == Mode.CLEAN_BG:  # medium size noise is filtered
         transformed = cv.medianBlur(binary_image, 3)
-        transformed = remove_contour_noise(transformed, NOISE_FACTOR/2.0)
+
+        transformed = remove_contour_noise(transformed, NOISE_FACTOR / 2.0)
         if thresh_val == GLOBAL_THRESH_FAILED:  # also remove pepper noise if local thresholding was applied
             transformed = cv.morphologyEx(transformed, cv.MORPH_CLOSE, Kernel.k5)
     elif mode == Mode.PRINTED:  # only salt noise is filtered
         transformed = cv.medianBlur(binary_image, 3)
-        transformed = remove_contour_noise(transformed, NOISE_FACTOR/4.0)
+        transformed = remove_contour_noise(transformed, NOISE_FACTOR / 4.0)
     else:
         print("Mode is not supported! Transformation makes no changes.")
         transformed = np.copy(binary_image)
@@ -156,7 +168,7 @@ def remove_contour_noise(image: np.ndarray, max_noise_factor: float) -> np.ndarr
 
     for i in range(0, len(contours)):
 
-        if cv.contourArea(contours[i]) <= image.shape[0]*image.shape[1]*max_noise_factor:
+        if cv.contourArea(contours[i]) <= image.shape[0] * image.shape[1] * max_noise_factor:
             # fill contour area with background color
             cv.drawContours(image, contours, contourIdx=i, color=0, thickness=cv.FILLED)
 
@@ -277,14 +289,16 @@ def remove_vertical_grid(binary_image: np.ndarray) -> np.ndarray:
     :return: image without vertical grid
     """
     # 1st step - extract vertically aligned pixels from image using structuring element
+
     height = binary_image.shape[0]
-    structure = cv.getStructuringElement(cv.MORPH_RECT, (1, height//50))
+    structure = cv.getStructuringElement(cv.MORPH_RECT, (1, height // 50))
     vertical = cv.erode(binary_image, structure)
     vertical = cv.dilate(vertical, structure)
     vertical = cv.dilate(vertical, Kernel.k3, iterations=1)
 
     # 2nd step - fit straight lines across whole image to create a mask
-    lines = cv.HoughLines(vertical, 1, np.pi/180, 400)
+    lines = cv.HoughLines(vertical, 1, np.pi / 180, 400)
+
     vertical_mask = np.zeros((vertical.shape[0], vertical.shape[1]), np.uint8)
     if lines is not None:
         for line in lines:
@@ -335,25 +349,86 @@ def crop_bg_padding(binary_transformed: np.ndarray, images: list) -> (np.ndarray
     return binary_transformed, images
 
 
-def delete_characters(image: np.ndarray) -> np.ndarray:
+def delete_characters(transformed: np.ndarray) -> np.ndarray:
     """
     Remove "characters" (noise) of small sizes
 
     :param image: Image after binarization
     :return: Image without noise
     """
-    # findContours returns 3 variables for getting contours
+    image = transformed.copy()
+    height, width = image.shape[:2]
+
     contours, hierarchy = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
     for contour in contours:
+        wider_clipping = False
+        hist2 = []
         # get rectangle bounding contour
         [x, y, w, h] = cv.boundingRect(contour)
 
-        # Ignore large counters
-        if w > 60 and h > 60:
-            continue
+        # if possible cut out the contour wider and longer than found
+        if 1 < x and (x + w + 4) < width and 1 < y and (y + h + 4) < height:
+            x = x - 2
+            y = y - 2
+            w = w + 4
+            h = h + 4
+            wider_clipping = True
+        crop_image = image[y: y + h, x: x + w].copy()
 
-        # draw rectangle on original image
-        cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
+        # if empty vertices of the graph have a thick edge,
+        # the findContours function draws the contours inside and outside the vertex.
+        # When calculating the average distance of white pixels from the center of the cut image,
+        # we filter out the contours detected inside the vertex
+        white_img = np.zeros([h, w, 1], dtype=np.uint8)
+        white_img.fill(255)
+        white_img[int(h / 2)][int(w / 2)] = 0
+        dst = cv.distanceTransform(white_img, cv.DIST_C, 3, cv.DIST_LABEL_PIXEL)
+        avarage = cv.mean(dst, mask=crop_image)
+
+        if avarage[0] < 0.4 * ((h + w) / 2):
+
+            # sometimes when the vertex contour is thin,
+            # "cv.HoughCircles" does not detect it,
+            # so when counting the histogram for the eroded image,
+            # we ignore such vertices (unfortunately such a filter also leaves noises)
+            cv.rectangle(crop_image, (0, 0), (w - 1, h - 1), 0, 1)
+            eroded = cv.erode(crop_image, Kernel.k3, iterations=1)
+            hist = cv.calcHist([eroded], [0], None, [256], [0, 256])
+            if hist[255] / (hist[255] + hist[0]) > 0.005:
+                # recognition of vertices in the cut image
+                circles = cv.HoughCircles(crop_image, cv.HOUGH_GRADIENT, 1, 20,
+                                          param1=30,
+                                          param2=20,
+                                          minRadius=0,
+                                          maxRadius=0)
+                if circles is not None:
+                    continue
+
+                # recognition of lines in the cut image
+                lines = cv.HoughLinesP(crop_image, 2, np.pi / 180, 40, 0, 0)
+                is_edge = False
+                if lines is not None:
+                    black_img = np.zeros([h, w], dtype=np.uint8)
+                    for j in range(0, len(lines)):
+                        x1 = lines[j][0][0]
+                        y1 = lines[j][0][1]
+                        x2 = lines[j][0][2]
+                        y2 = lines[j][0][3]
+                        length = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+                        if length > 15 and w * h > 625:
+                            is_edge = True
+                            cv.line(black_img, (x1, y1), (x2, y2), 255, 2)
+                    # we calculate the difference of the image cut out and with the lines marked,
+                    # and then the histogram of the resulting image
+                    # such an algorithm allows you to filter out contours containing the edges of the graph
+                    sub_image = crop_image-black_img
+                    hist2 = cv.calcHist([sub_image], [0], None, [256], [0, 256])
+
+                if (is_edge is True and hist2[255] / (hist2[255] + hist2[0]) > 0.08) or is_edge is False:
+                    if wider_clipping:
+                        cv.rectangle(image, (x + 1, y + 1), (x + w - 2, y + h - 2), 0, -1)
+                    else:
+                        cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
 
     return image
