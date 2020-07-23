@@ -31,32 +31,28 @@ pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files (x86)\\Tesseract-OCR\
 
 def preprocess(source: np.ndarray, imshow_enabled: bool, i, file_name) -> (np.ndarray, np.ndarray, np.ndarray):
     """
-    Processes source image by reshaping, thresholding and noise filering.
+    Processes source image by reshaping, thresholding, transforming and cropping.
 
     :param source: input image
     :param imshow_enabled: flag determining to display (or not) preprocessing steps
-    :return: reshaped, binarized, and filtered images.
+    :return: reshaped, binarized, and fully preprocessed images.
     """
-    # reshape to standard orientation, and resolution
+    # Reshape image to standard resolution
     reshaped = reshape(source, WIDTH_LIM, HEIGHT_LIM)
 
-    # converting image to gray scale
+    # Convert image to gray scale
     gray = cv.cvtColor(reshaped, cv.COLOR_BGR2GRAY)
 
     # Threshold (binarize) image
     binary, threshold_value = threshold(gray, MIN_BRIGHT_VAL, MAX_FILL_RATIO)
 
     # Transform image (filter noise, remove grid, ...)
-    transformed = transform(binary, threshold_value, Mode.PRINTED)  # TODO - mode from command line
+    transformed = transform(binary, threshold_value, Mode.CLEAN_BG)  # TODO - mode from command line
 
+    # Remove unnecessary background
+    transformed, [reshaped, binary] = crop_bg_padding(transformed, [reshaped, binary])
     delete_characters(transformed, reshaped, i)
-    # TODO - change parametrization of circles Transform in segmentation that works with this crop
-    # Crop images to remove unnecessary background
-    # object_pixels = cv.findNonZero(filtered)
-    # x, y, w, h = cv.boundingRect(object_pixels)
-    # source = source[y:y+h, x:x+w]
-    # binary = binary[y:y+h, x:x+w]
-    # filtered = filtered[y:y+h, x:x+w]
+
 
     # Display results of preprocessing steps
     if imshow_enabled:
@@ -134,32 +130,41 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
 
 
 def transform(binary_image: np.ndarray, thresh_val: int, mode: Mode) -> np.ndarray:
-    if mode == Mode.GRID_BG:
+    """
+    Filter image from noise (and sometimes grid) by performing various transformations depending on mode parameter.
+
+    :param binary_image: input binary image
+    :param thresh_val: value from thresholding, indicates if global thresholding had been successful
+    :param mode: indicates properties of input photo (see shared.py for details)
+    :return: Transformed (filtered) image
+    """
+    if mode == Mode.GRID_BG:  # grid and noise are filtered from the picture
         if thresh_val != GLOBAL_THRESH_FAILED:
             transformed = filter_grid(binary_image, 40, 3, NOISE_FACTOR)
         else:
             transformed = filter_grid(binary_image, 30, 3, NOISE_FACTOR)
-    elif mode == Mode.CLEAN_BG:
+    elif mode == Mode.CLEAN_BG:  # medium size noise is filtered
         transformed = cv.medianBlur(binary_image, 3)
-        transformed = remove_contour_noise(transformed, NOISE_FACTOR / 2.0)
-        if thresh_val == GLOBAL_THRESH_FAILED:
+
+        transformed = remove_contour_noise(transformed, NOISE_FACTOR/2.0)
+        if thresh_val == GLOBAL_THRESH_FAILED:  # also remove pepper noise if local thresholding was applied
             transformed = cv.morphologyEx(transformed, cv.MORPH_CLOSE, Kernel.k5)
-    elif mode == Mode.PRINTED:
+    elif mode == Mode.PRINTED:  # only salt noise is filtered
         transformed = cv.medianBlur(binary_image, 3)
         transformed = remove_contour_noise(transformed, NOISE_FACTOR / 4.0)
     else:
-        print("Mode is not supported!")
+        print("Mode is not supported! Transformation makes no changes.")
         transformed = np.copy(binary_image)
     return transformed
 
 
 def remove_contour_noise(image: np.ndarray, max_noise_factor: float) -> np.ndarray:
     """
-    Remove small closed contours from the image, that can be considered as a noise.
-    Designed mainly to remove small dots that remain after removing the grid from the image.
+    Remove small closed contours from the image, that can be considered noise.
+    Contour is classified as noise if its area is not greater than image area multiplied by tiny given factor.
 
     :param image: binary image
-    :param max_noise_factor: factor to take part of image area as upper limit for noise area
+    :param max_noise_factor: tiny factor to take part of image area as upper limit for noise area
     :return: Image with noise filtered out
     """
     contours, _ = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
@@ -174,10 +179,23 @@ def remove_contour_noise(image: np.ndarray, max_noise_factor: float) -> np.ndarr
 
 
 def filter_grid(binary_image: np.ndarray, min_distance: int, start_kernel: int, max_noise_factor: float) -> np.ndarray:
+    """
+    Filters grid from the image
+    Such filtering is based on a fact that vertices should be thicker than grid
+    To achieve grid filtering an optimal kernel size for medianBlur is found
+
+    :param binary_image: input binary image
+    :param min_distance: minimal average distance of background pixels from object pixels to consider grid filtered out
+    :param start_kernel: minimal kernel size for median filter
+    :param max_noise_factor: see remove contour noise function description
+    :return: image with grid filtered out
+    """
     binary = np.copy(binary_image)
     avg = avg_bg_distance(binary)
-    if avg < min_distance:
-        for i in range(0, 3):
+    if avg < min_distance:  # small average distance indicates that a lot of grid remained in the picture
+        # Loop below searches for optimal kernel size for median filter
+        # It achieves that, by applying median filters and checking if background distance has reached acceptable level
+        for i in range(0, 4):
             if avg < min_distance:
                 image = cv.medianBlur(binary, start_kernel + i * 2)
                 image = remove_contour_noise(image, max_noise_factor)
@@ -185,39 +203,59 @@ def filter_grid(binary_image: np.ndarray, min_distance: int, start_kernel: int, 
                 break
 
             avg = avg_bg_distance(image)
-    else:
+    else:  # for very clear images only contour filtering is applied
         image = remove_contour_noise(binary, max_noise_factor)
-    # remove remaining straight lines that go across whole image
+
+    # remove remaining straight (vertical and horizontal) lines
+    # usually the remaining lines are margins which are thicker than the rest of the grid an therefor are not filtered
     horizontal = remove_horizontal_grid(image)
     vertical = remove_vertical_grid(image)
+    # include removed pixels from both images
     image = cv.bitwise_and(horizontal, vertical)
 
     return image
 
 
+#
 def avg_bg_distance(binary_image: np.ndarray) -> float:
+    """
+    Calculate average distance from background pixel to nearest object pixel
+    Calculations are applied for 4 regions of image (top, bottom)x(left, right) and minimal average distance is returned
+
+    :param binary_image: input binary image
+    :return: average distance form background pixel to another
+    """
     negative = cv.bitwise_not(binary_image)
     distance = cv.distanceTransform(negative, cv.DIST_L2, 3)
     width = distance.shape[1]
     height = distance.shape[0]
     mid_width = int(width / 2)
     mid_height = int(height / 2)
-    avgs = [
+    averages = [
         np.average(distance[0: mid_height, 0:mid_width]),
         np.average(distance[0:mid_height, mid_width:width]),
         np.average(distance[mid_height:height, 0:mid_width]),
         np.average(distance[mid_height:height, mid_width:width])
     ]
-    return np.min(avgs)
+    return np.min(averages)
 
 
+# TODO - change grid function with HoughLines to only remove margins
 def remove_horizontal_grid(binary_image: np.ndarray) -> np.ndarray:
+    """
+    Remove horizontal grid lines (long lines that go across image y axis)
+
+    :param binary_image: input image
+    :return: image without horizontal grid
+    """
+    # 1st step - extract horizontally aligned pixels from image using structuring element
     width = binary_image.shape[1]
     structure = cv.getStructuringElement(cv.MORPH_RECT, (width // 50, 1))
     horizontal = cv.erode(binary_image, structure)
     horizontal = cv.dilate(horizontal, structure)
     horizontal = cv.dilate(horizontal, Kernel.k3, iterations=1)
 
+    # 2nd step - fit straight lines across whole image to create a mask
     lines = cv.HoughLines(horizontal, 1, np.pi / 180, 500)
     horizontal_mask = np.zeros((horizontal.shape[0], horizontal.shape[1]), np.uint8)
     if lines is not None:
@@ -228,12 +266,14 @@ def remove_horizontal_grid(binary_image: np.ndarray) -> np.ndarray:
             x0 = a * rho
             y0 = b * rho
             x1 = int(x0 + 1500 * (-b))
-            y1 = int(y0 + 1500 * (a))
+            y1 = int(y0 + 1500 * a)
             x2 = int(x0 - 1500 * (-b))
-            y2 = int(y0 - 1500 * (a))
+            y2 = int(y0 - 1500 * a)
             cv.line(horizontal_mask, (x1, y1), (x2, y2), 255, 7)
+    # 3rd step - apply mask to image so that only lines that go across all pictures width remain
     masked = cv.bitwise_and(horizontal, horizontal_mask)
     masked = cv.erode(masked, Kernel.k3, iterations=1)
+    # 4th step - find reasonably long lines on masked image and remove them from original image
     lines = cv.HoughLinesP(masked, 1, np.pi / 180, threshold=20, minLineLength=width // 25, maxLineGap=10)
     image = np.copy(binary_image)
     if lines is not None:
@@ -245,13 +285,23 @@ def remove_horizontal_grid(binary_image: np.ndarray) -> np.ndarray:
 
 
 def remove_vertical_grid(binary_image: np.ndarray) -> np.ndarray:
+    """
+    Remove vertical grid lines (long lines that go across image x axis)
+
+    :param binary_image: input image
+    :return: image without vertical grid
+    """
+    # 1st step - extract vertically aligned pixels from image using structuring element
+
     height = binary_image.shape[0]
     structure = cv.getStructuringElement(cv.MORPH_RECT, (1, height // 50))
     vertical = cv.erode(binary_image, structure)
     vertical = cv.dilate(vertical, structure)
-
     vertical = cv.dilate(vertical, Kernel.k3, iterations=1)
-    lines = cv.HoughLines(vertical, 1, np.pi / 180, 400)
+
+    # 2nd step - fit straight lines across whole image to create a mask
+    lines = cv.HoughLines(vertical, 1, np.pi/180, 400)
+
     vertical_mask = np.zeros((vertical.shape[0], vertical.shape[1]), np.uint8)
     if lines is not None:
         for line in lines:
@@ -265,8 +315,10 @@ def remove_vertical_grid(binary_image: np.ndarray) -> np.ndarray:
             x2 = int(x0 - 1500 * (-b))
             y2 = int(y0 - 1500 * (a))
             cv.line(vertical_mask, (x1, y1), (x2, y2), 255, 7)
+    # 3rd step - apply mask to image so that only lines that go across all pictures height remain
     masked = cv.bitwise_and(vertical, vertical_mask)
     masked = cv.erode(masked, Kernel.k3, iterations=1)
+    # 4th step - find reasonably long lines on masked image and remove them from original image
     lines = cv.HoughLinesP(masked, 1, np.pi / 180, threshold=30, minLineLength=height // 25, maxLineGap=10)
     image = np.copy(binary_image)
     if lines is not None:
@@ -275,6 +327,29 @@ def remove_vertical_grid(binary_image: np.ndarray) -> np.ndarray:
             cv.line(image, (x1, y1), (x2, y2), 0, 2)
 
     return image
+
+
+def crop_bg_padding(binary_transformed: np.ndarray, images: list) -> (np.ndarray, list):
+    """
+    Crop images to remove background padding (unnecessary background surrounding graph)
+
+    :param binary_transformed: binarized and transformed (noise filtered) input image
+    :param images: all other images
+    :return: cropped images in the same order as in input - separately: transformed, and all other in list
+    """
+    # Find all object pixels in transformed image
+    object_pixels = cv.findNonZero(binary_transformed)
+    # Find minimal rectangular area in transformed image, that includes all object pixels - area without padding
+    left, top, width, height = cv.boundingRect(object_pixels)
+    right = left + width
+    bottom = top + height
+
+    # Crop all given images to new minimal size - removes padding
+    binary_transformed = binary_transformed[top:bottom, left:right]
+    if images is not None:
+        for i in range(0, len(images)):
+            images[i] = images[i][top:bottom, left:right]
+    return binary_transformed, images
 
 
 def delete_characters(image: np.ndarray, source: np.ndarray, i) -> np.ndarray:
