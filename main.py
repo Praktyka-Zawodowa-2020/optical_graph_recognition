@@ -31,8 +31,8 @@ def load_image(file_index):
         "article.png",
         "article_no_text.png"
     ]
-    # source = cv.imread("./graphs-895/" + file_names[file_index])
-    source = cv.imread("../../Praktyki2020/Resources/22.jpg")
+    source = cv.imread("./graphs/" + file_names[file_index])
+    # source = cv.imread("../../Praktyki2020/Resources/01.jpg")
     return source
 
 
@@ -55,45 +55,40 @@ def parse_argument(file_path: str) -> str:
 
 
 def main(args=None):
-    #source = load_image(file_index=0)
-    # args = parser.parse_args()
-    # file_path = args.path
-    # formats = args.formats
-    # save_path = parse_argument(file_path)
-    #
-    # if len(save_path) == 0:
-    #     return -1
-    #
-    # source = cv.imread(file_path)
-    for i in range(1, 50):
-        if i < 10:
-            source = cv.imread("../../Praktyki2020/Resources/0"+ str(i) +".jpg")
+    # source = load_image(file_index=0)
+    args = parser.parse_args()
+    file_path = args.path
+    formats = args.formats
+    save_path = parse_argument(file_path)
+
+    if len(save_path) == 0:
+        return -1
+
+    source = cv.imread(file_path)
+    if source is not None:  # read successful, process image
+
+        source, binary, preprocessed = preprocess(source, False)
+
+        vertices_list, visualised = segment(source, binary, preprocessed, False)
+        if len(vertices_list) == 0:
+            print("No vertices found")
+            return -1
+
+        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
+
+        if formats == "graphml":
+            graphml_format(vertices_list, save_path)
+        elif formats == "g6":
+            graph6_format(vertices_list, save_path)
         else:
-            source = cv.imread("../../Praktyki2020/Resources/" + str(i) + ".jpg")
-        if source is not None:  # read successful, process image
-            file_name=str(i)+".jpg"
-            source, binary, preprocessed = preprocess(source, False,i,file_name)
-
-            vertices_list, visualised = segment(source, binary, preprocessed, False)
-            if len(vertices_list) == 0:
-                print("No vertices found")
-                return -1
-
-            vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
-        # if formats == "graphml":
-        #     graphml_format(vertices_list, save_path)
-        # elif formats == "g6":
-        #     graph6_format(vertices_list, save_path)
-        # else:
-        #     print("No Format found")
-        #     return -1
-        #cv.imshow("source", source)
+            print("No Format found")
+            return -1
 
         # display all windows until key is pressed
-        #cv.waitKey(0)
-        else:
-            print("Error opening image!")
-            return -1
+        cv.waitKey(0)
+    else:
+        print("Error opening image!")
+        return -1
 
 
 if __name__ == "__main__":

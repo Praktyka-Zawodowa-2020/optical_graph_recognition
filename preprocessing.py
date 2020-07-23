@@ -29,7 +29,7 @@ NOISE_FACTOR: float = 0.0001  # px^2
 pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe'
 
 
-def preprocess(source: np.ndarray, imshow_enabled: bool, i, file_name) -> (np.ndarray, np.ndarray, np.ndarray):
+def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndarray, np.ndarray):
     """
     Processes source image by reshaping, thresholding, transforming and cropping.
 
@@ -51,7 +51,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool, i, file_name) -> (np.nd
 
     # Remove unnecessary background
     transformed, [reshaped, binary] = crop_bg_padding(transformed, [reshaped, binary])
-    delete_characters(transformed, reshaped, i)
+    delete_characters(transformed)
 
     # Display results of preprocessing steps
     if imshow_enabled:
@@ -351,25 +351,15 @@ def crop_bg_padding(binary_transformed: np.ndarray, images: list) -> (np.ndarray
     return binary_transformed, images
 
 
-def delete_characters(image: np.ndarray, source: np.ndarray, i) -> np.ndarray:
+def delete_characters(image: np.ndarray) -> np.ndarray:
     """
     Remove "characters" (noise) of small sizes
 
     :param image: Image after binarization
     :return: Image without noise
     """
-    print("obraz ", i)
-    if not os.path.exists("./testCountour/" + str(i)):
-        os.mkdir("./testCountour/" + str(i))
-    if not os.path.exists("./testCountour/" + str(i) + "/przetwarzane"):
-        os.mkdir("./testCountour/" + str(i) + "/przetwarzane")
-    if not os.path.exists("./testCountour/" + str(i) + "/nieprzetwarzane"):
-        os.mkdir("./testCountour/" + str(i) + "/nieprzetwarzane")
+
     height, width = image.shape[:2]
-    print(width, height)
-
-    cv.imwrite("testCountour/" + str(i) + "/before.jpg", image)
-
     contours, hierarchy = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
     k = -1
 
@@ -381,8 +371,6 @@ def delete_characters(image: np.ndarray, source: np.ndarray, i) -> np.ndarray:
         [x, y, w, h] = cv.boundingRect(contour)
 
         if 5 < w < 80 and 5 < h < 80:
-            # print(x,y,x+w,y+h,end="")
-            cv.rectangle(source, (x, y), (x + w, y + h), (0, 255, 0), 1)
             if 1 < x and (x + w + 4) < width and 1 < y and (y + h + 4) < height:
                 x = x - 2
                 y = y - 2
@@ -410,9 +398,6 @@ def delete_characters(image: np.ndarray, source: np.ndarray, i) -> np.ndarray:
                                               minRadius=0,
                                               maxRadius=0)
                     if circles is not None:
-                        cv.imwrite(
-                            "testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
-                                hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + "_circle.jpg", crop_image)
                         continue
 
                     lines = cv.HoughLinesP(crop_image, 2, np.pi / 180, 40, 0, 0)
@@ -426,11 +411,10 @@ def delete_characters(image: np.ndarray, source: np.ndarray, i) -> np.ndarray:
                             y2 = lines[j][0][3]
                             length = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
                             if length > 15 and w * h > 625:
-                                is_edge=True
+                                is_edge = True
                                 cv.line(black_img, (x1, y1), (x2, y2), 255, 2)
-                        sub_image=crop_image-black_img
+                        sub_image = crop_image-black_img
                         hist2 = cv.calcHist([sub_image], [0], None, [256], [0, 256])
-                        cv.imwrite("testCountour/" + str(i) + "/" + str(k)+"_"+str(hist2[255] / (hist2[255] + hist2[0])) + ".jpg", sub_image)
 
                     if circles is None:
                         if (is_edge is True and hist2[255] / (hist2[255] + hist2[0]) > 0.08) or is_edge is False:
@@ -438,35 +422,5 @@ def delete_characters(image: np.ndarray, source: np.ndarray, i) -> np.ndarray:
                                 cv.rectangle(image, (x + 1, y + 1), (x + w - 2, y + h - 2), 0, -1)
                             else:
                                 cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
-                        else:
-                            cv.imwrite(
-                                "testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
-                                 hist2[255] / (hist2[255] + hist2[0])) + "_" + str(avarage[0]) + "_line.jpg", crop_image)
 
-                        # letter = pytesseract.image_to_string(crop_image, config='--psm 10')
-                        # letter = re.findall('\w', letter)
-                        #
-                        # if len(letter) == 1:
-                        #     if letter[0] != '0' and letter[0] != 'O' and letter[0] != 'o' and letter[0] != 'Q':
-                        #         if flag:
-                        #             cv.rectangle(image, (x + 1, y + 1), (x + w - 2, y + h - 2), 0, -1)
-                        #         else:
-                        #             cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
-
-            # saving crop image
-            # if avarage[0] < 0.4 * ((h + w) / 2):
-            #     if hist[255] / (hist[255] + hist[0]) > 0.005 and circles is None:
-            #         cv.imwrite("testCountour/" + str(i) + "/przetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
-            #             hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + ".jpg", crop_image)
-            #     else:
-            #         cv.imwrite("testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
-            #             hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + ".jpg", crop_image)
-            # else:
-            #     cv.imwrite("testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
-            #         hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + ".jpg", crop_image)
-            #
-            # k += 1
-
-    cv.imwrite("testCountour/" + str(i) + "/canny.jpg", source)
-    cv.imwrite("testCountour/" + str(i) + "/after.jpg", image)
     return image
