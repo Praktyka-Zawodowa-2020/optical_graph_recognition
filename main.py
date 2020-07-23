@@ -67,7 +67,7 @@ def main(args=None):
     source = cv.imread(file_path)
     if source is not None:  # read successful, process image
 
-        source, binary, preprocessed = preprocess(source, True)
+        source, binary, preprocessed = preprocess(source, False)
 
         vertices_list, visualised = segment(source, binary, preprocessed, False)
         if len(vertices_list) == 0:
