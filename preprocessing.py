@@ -53,7 +53,6 @@ def preprocess(source: np.ndarray, imshow_enabled: bool, i, file_name) -> (np.nd
     transformed, [reshaped, binary] = crop_bg_padding(transformed, [reshaped, binary])
     delete_characters(transformed, reshaped, i)
 
-
     # Display results of preprocessing steps
     if imshow_enabled:
         cv.imshow("reshaped source " + str(reshaped.shape[1]) + "x" + str(reshaped.shape[0]), reshaped)
@@ -146,7 +145,7 @@ def transform(binary_image: np.ndarray, thresh_val: int, mode: Mode) -> np.ndarr
     elif mode == Mode.CLEAN_BG:  # medium size noise is filtered
         transformed = cv.medianBlur(binary_image, 3)
 
-        transformed = remove_contour_noise(transformed, NOISE_FACTOR/2.0)
+        transformed = remove_contour_noise(transformed, NOISE_FACTOR / 2.0)
         if thresh_val == GLOBAL_THRESH_FAILED:  # also remove pepper noise if local thresholding was applied
             transformed = cv.morphologyEx(transformed, cv.MORPH_CLOSE, Kernel.k5)
     elif mode == Mode.PRINTED:  # only salt noise is filtered
@@ -300,7 +299,7 @@ def remove_vertical_grid(binary_image: np.ndarray) -> np.ndarray:
     vertical = cv.dilate(vertical, Kernel.k3, iterations=1)
 
     # 2nd step - fit straight lines across whole image to create a mask
-    lines = cv.HoughLines(vertical, 1, np.pi/180, 400)
+    lines = cv.HoughLines(vertical, 1, np.pi / 180, 400)
 
     vertical_mask = np.zeros((vertical.shape[0], vertical.shape[1]), np.uint8)
     if lines is not None:
@@ -372,11 +371,12 @@ def delete_characters(image: np.ndarray, source: np.ndarray, i) -> np.ndarray:
     cv.imwrite("testCountour/" + str(i) + "/before.jpg", image)
 
     contours, hierarchy = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    k = 0
+    k = -1
 
     for contour in contours:
-        flag = 0
-        circles = None
+        flag = False
+        letter = []
+        hist2=[]
         # get rectangle bounding contour
         [x, y, w, h] = cv.boundingRect(contour)
 
@@ -388,75 +388,84 @@ def delete_characters(image: np.ndarray, source: np.ndarray, i) -> np.ndarray:
                 y = y - 2
                 w = w + 4
                 h = h + 4
-                flag = 1
+                flag = True
             crop_image = image[y: y + h, x: x + w].copy()
             color_img = cv.cvtColor(crop_image, cv.COLOR_GRAY2BGR)
-            canny = cv.Canny(color_img, 50, 200)
 
             white_img = np.zeros([h, w, 1], dtype=np.uint8)
             white_img.fill(255)
             white_img[int(h / 2)][int(w / 2)] = 0
             dst = cv.distanceTransform(white_img, cv.DIST_C, 3, cv.DIST_LABEL_PIXEL)
             avarage = cv.mean(dst, mask=crop_image)
-            # print(avarage[0])
-            # print("   ",x, y,x+ w,y+ h)
-            letter = []
-            cv.rectangle(crop_image, (0, 0), (w - 1, h - 1), 0, 1)
-            eroded = cv.erode(crop_image, Kernel.k3, iterations=1)
-            hist = cv.calcHist([eroded], [0], None, [256], [0, 256])
+
             if avarage[0] < 0.4 * ((h + w) / 2):
+                cv.rectangle(crop_image, (0, 0), (w - 1, h - 1), 0, 1)
+                eroded = cv.erode(crop_image, Kernel.k3, iterations=1)
+                hist = cv.calcHist([eroded], [0], None, [256], [0, 256])
                 if hist[255] / (hist[255] + hist[0]) > 0.005:
+                    k+=1
                     circles = cv.HoughCircles(crop_image, cv.HOUGH_GRADIENT, 1, 20,
                                               param1=30,
                                               param2=20,
                                               minRadius=0,
                                               maxRadius=0)
+                    if circles is not None:
+                        cv.imwrite(
+                            "testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
+                                hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + "_circle.jpg", crop_image)
+                        continue
+
                     lines = cv.HoughLinesP(crop_image, 2, np.pi / 180, 40, 0, 0)
+                    is_edge = False
                     if lines is not None:
-                        # for j in range(0, len(lines)):
-                        #     rho = lines[j][0][0]
-                        #     theta = lines[j][0][1]
-                        #     a = math.cos(theta)
-                        #     b = math.sin(theta)
-                        #     x0 = a * rho
-                        #     y0 = b * rho
-                        #     pt1 = (int(x0 + 1000 * (-b)), int(y0 + 1000 * (a)))
-                        #     pt2 = (int(x0 - 1000 * (-b)), int(y0 - 1000 * (a)))
-                        #     cv.line(color_img, pt1, pt2, (0, 0, 255), 2, cv.LINE_AA)
-                        print(len(lines))
+                        black_img = np.zeros([h, w], dtype=np.uint8)
                         for j in range(0, len(lines)):
                             x1 = lines[j][0][0]
                             y1 = lines[j][0][1]
                             x2 = lines[j][0][2]
                             y2 = lines[j][0][3]
-                            cv.line(color_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        cv.imwrite("testCountour/" + str(i) + "/" + str(k) + ".jpg", color_img)
+                            length = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+                            if length > 15 and w * h > 625:
+                                is_edge=True
+                                cv.line(black_img, (x1, y1), (x2, y2), 255, 2)
+                        sub_image=crop_image-black_img
+                        hist2 = cv.calcHist([sub_image], [0], None, [256], [0, 256])
+                        cv.imwrite("testCountour/" + str(i) + "/" + str(k)+"_"+str(hist2[255] / (hist2[255] + hist2[0])) + ".jpg", sub_image)
 
                     if circles is None:
-                        configuration = '--psm 10 --dpi ' + str(w * h)
-                        letter = pytesseract.image_to_string(crop_image, config=configuration)
-                        letter = re.findall('\w', letter)
+                        if (is_edge is True and hist2[255] / (hist2[255] + hist2[0]) > 0.08) or is_edge is False:
+                            if flag:
+                                cv.rectangle(image, (x + 1, y + 1), (x + w - 2, y + h - 2), 0, -1)
+                            else:
+                                cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
+                        else:
+                            cv.imwrite(
+                                "testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
+                                 hist2[255] / (hist2[255] + hist2[0])) + "_" + str(avarage[0]) + "_line.jpg", crop_image)
 
-            if len(letter) == 1:
-                if letter[0] != '0' and letter[0] != 'O' and letter[0] != 'o' and letter[0] != 'Q':
-                    if flag:
-                        cv.rectangle(image, (x + 1, y + 1), (x + w - 2, y + h - 2), 0, -1)
-                    else:
-                        cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
+                        # letter = pytesseract.image_to_string(crop_image, config='--psm 10')
+                        # letter = re.findall('\w', letter)
+                        #
+                        # if len(letter) == 1:
+                        #     if letter[0] != '0' and letter[0] != 'O' and letter[0] != 'o' and letter[0] != 'Q':
+                        #         if flag:
+                        #             cv.rectangle(image, (x + 1, y + 1), (x + w - 2, y + h - 2), 0, -1)
+                        #         else:
+                        #             cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
 
             # saving crop image
-            if avarage[0] < 0.4 * ((h + w) / 2):
-                if hist[255] / (hist[255] + hist[0]) > 0.005 and circles is None:
-                    cv.imwrite("testCountour/" + str(i) + "/przetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
-                        hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + ".jpg", crop_image)
-                else:
-                    cv.imwrite("testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
-                        hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + ".jpg", crop_image)
-            else:
-                cv.imwrite("testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
-                    hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + ".jpg", crop_image)
-
-            k += 1
+            # if avarage[0] < 0.4 * ((h + w) / 2):
+            #     if hist[255] / (hist[255] + hist[0]) > 0.005 and circles is None:
+            #         cv.imwrite("testCountour/" + str(i) + "/przetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
+            #             hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + ".jpg", crop_image)
+            #     else:
+            #         cv.imwrite("testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
+            #             hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + ".jpg", crop_image)
+            # else:
+            #     cv.imwrite("testCountour/" + str(i) + "/nieprzetwarzane/" + str(k) + '_' + str(letter) + '_' + str(
+            #         hist[255] / (hist[255] + hist[0])) + "_" + str(avarage[0]) + ".jpg", crop_image)
+            #
+            # k += 1
 
     cv.imwrite("testCountour/" + str(i) + "/canny.jpg", source)
     cv.imwrite("testCountour/" + str(i) + "/after.jpg", image)

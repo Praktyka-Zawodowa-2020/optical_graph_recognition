@@ -65,7 +65,7 @@ def main(args=None):
     #     return -1
     #
     # source = cv.imread(file_path)
-    for i in range(12, 50):
+    for i in range(1, 50):
         if i < 10:
             source = cv.imread("../../Praktyki2020/Resources/0"+ str(i) +".jpg")
         else:
