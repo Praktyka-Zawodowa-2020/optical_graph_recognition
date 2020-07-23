@@ -1,9 +1,6 @@
 """Module with operations that are used to preprocess a graph picture"""
 import cv2 as cv
 import numpy as np
-import pytesseract
-import re
-import os
 import math
 from shared import Kernel, Color, Mode
 
@@ -25,8 +22,6 @@ MIN_BRIGHT_VAL: int = 110  # bright image lower limit of pixel value
 MAX_FILL_RATIO: float = 0.14  # ratio of object pixels to all pixels
 # for contour noise filtering
 NOISE_FACTOR: float = 0.0001  # px^2
-
-pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe'
 
 
 def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndarray, np.ndarray):
@@ -51,13 +46,16 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
 
     # Remove unnecessary background
     transformed, [reshaped, binary] = crop_bg_padding(transformed, [reshaped, binary])
-    delete_characters(transformed)
+
+    # Remove characters
+    without_chars = delete_characters(transformed)
 
     # Display results of preprocessing steps
     if imshow_enabled:
         cv.imshow("reshaped source " + str(reshaped.shape[1]) + "x" + str(reshaped.shape[0]), reshaped)
         cv.imshow("binary, th=" + str(threshold_value), binary)
         cv.imshow("transformed", transformed)
+        cv.imshow("Chars deleted", without_chars)
 
     return reshaped, binary, transformed
 
@@ -351,22 +349,21 @@ def crop_bg_padding(binary_transformed: np.ndarray, images: list) -> (np.ndarray
     return binary_transformed, images
 
 
-def delete_characters(image: np.ndarray) -> np.ndarray:
+def delete_characters(source: np.ndarray) -> np.ndarray:
     """
     Remove "characters" (noise) of small sizes
 
     :param image: Image after binarization
     :return: Image without noise
     """
-
+    image = source.copy()
     height, width = image.shape[:2]
     contours, hierarchy = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    k = -1
 
     for contour in contours:
         flag = False
         letter = []
-        hist2=[]
+        hist2 = []
         # get rectangle bounding contour
         [x, y, w, h] = cv.boundingRect(contour)
 
@@ -378,7 +375,6 @@ def delete_characters(image: np.ndarray) -> np.ndarray:
                 h = h + 4
                 flag = True
             crop_image = image[y: y + h, x: x + w].copy()
-            color_img = cv.cvtColor(crop_image, cv.COLOR_GRAY2BGR)
 
             white_img = np.zeros([h, w, 1], dtype=np.uint8)
             white_img.fill(255)
@@ -391,7 +387,6 @@ def delete_characters(image: np.ndarray) -> np.ndarray:
                 eroded = cv.erode(crop_image, Kernel.k3, iterations=1)
                 hist = cv.calcHist([eroded], [0], None, [256], [0, 256])
                 if hist[255] / (hist[255] + hist[0]) > 0.005:
-                    k+=1
                     circles = cv.HoughCircles(crop_image, cv.HOUGH_GRADIENT, 1, 20,
                                               param1=30,
                                               param2=20,
@@ -416,11 +411,10 @@ def delete_characters(image: np.ndarray) -> np.ndarray:
                         sub_image = crop_image-black_img
                         hist2 = cv.calcHist([sub_image], [0], None, [256], [0, 256])
 
-                    if circles is None:
-                        if (is_edge is True and hist2[255] / (hist2[255] + hist2[0]) > 0.08) or is_edge is False:
-                            if flag:
-                                cv.rectangle(image, (x + 1, y + 1), (x + w - 2, y + h - 2), 0, -1)
-                            else:
-                                cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
+                    if (is_edge is True and hist2[255] / (hist2[255] + hist2[0]) > 0.08) or is_edge is False:
+                        if flag:
+                            cv.rectangle(image, (x + 1, y + 1), (x + w - 2, y + h - 2), 0, -1)
+                        else:
+                            cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
 
     return image
