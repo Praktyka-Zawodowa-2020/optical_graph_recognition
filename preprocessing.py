@@ -426,9 +426,6 @@ def delete_characters(transformed: np.ndarray) -> np.ndarray:
                     hist2 = cv.calcHist([sub_image], [0], None, [256], [0, 256])
 
                 if (is_edge is True and hist2[255] / (hist2[255] + hist2[0]) > 0.08) or is_edge is False:
-                    if wider_clipping:
-                        cv.rectangle(image, (x + 1, y + 1), (x + w - 2, y + h - 2), 0, -1)
-                    else:
-                        cv.rectangle(image, (x, y), (x + w, y + h), 0, -1)
+                    cv.drawContours(image, [contour], -1, 0, -1)
 
     return image
