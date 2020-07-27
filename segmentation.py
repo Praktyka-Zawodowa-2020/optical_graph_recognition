@@ -84,11 +84,35 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     :param image: preprocessed image with filled vertices
     :return dilated: image without edges (only vertices pixels)
     """
-    dst = cv.distanceTransform(image, cv.DIST_C, 3)
-    K = extreme(dst)
     kernel = Kernel.k3
+    eroded = image.copy()
+    contours, _ = cv.findContours(eroded, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    start, before = len(contours), len(contours)
+    K, counter = 0, 0
+
     # eroding k times
-    eroded = cv.erode(image, kernel, iterations=K)
+    while True:
+        i = len(contours)
+        if i == before and before != start:
+            counter = counter+1
+        else:
+            counter = 0
+
+        if start != i:
+            start = 0
+        if counter == 1:
+            break
+        eroded = cv.erode(eroded, kernel, iterations=1)
+        K = K + 1
+        contours, _ = cv.findContours(eroded, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+        before = i
+
+        if len(contours) == 0:
+            break
+
+    eroded = cv.erode(eroded, kernel, iterations=1)
+    K = K+1
+
     # dilating k times
     dilated = cv.dilate(eroded, kernel, iterations=K)
     return dilated

@@ -48,7 +48,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
     transformed, [reshaped, binary] = crop_bg_padding(transformed, [reshaped, binary])
 
     # Remove characters
-    without_chars = delete_characters(transformed)
+    without_chars = delete_characters(transformed)  # TODO - mode from command line
 
     # Display results of preprocessing steps
     if imshow_enabled:
@@ -57,7 +57,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
         cv.imshow("transformed", transformed)
         cv.imshow("Chars deleted", without_chars)
 
-    return reshaped, binary, transformed
+    return reshaped, binary, without_chars
 
 
 def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
