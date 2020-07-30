@@ -4,7 +4,6 @@ import numpy as np
 
 from math import ceil, floor, sqrt
 from Vertex import Vertex
-from chamford import extreme
 # Below are constants for HoughCircles function
 from shared import Color, Kernel
 

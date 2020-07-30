@@ -10,8 +10,6 @@ from postprocesing import graph6_format, graphml_format
 
 parser = argparse.ArgumentParser("Optical graph recognition")
 parser.add_argument("-p", "--path", help="Path to file")
-parser.add_argument("-f", "--formats", help="File format. Possible option: g6, graphml", default="graphml",
-                    choices=['graphml', 'g6'])
 
 
 # parser.add_argument("-b", "--background", help="TO DO. Choise background", default=1, choices=['1', '2'])
@@ -32,7 +30,6 @@ def load_image(file_index):
         "article_no_text.png"
     ]
     source = cv.imread("./graphs/" + file_names[file_index])
-    # source = cv.imread("../../Praktyki2020/Resources/01.jpg")
     return source
 
 
@@ -58,7 +55,6 @@ def main(args=None):
     # source = load_image(file_index=0)
     args = parser.parse_args()
     file_path = args.path
-    formats = args.formats
     save_path = parse_argument(file_path)
 
     if len(save_path) == 0:
@@ -75,14 +71,9 @@ def main(args=None):
             return -1
 
         vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
+        graphml_format(vertices_list, save_path)
+        graph6_format(vertices_list, save_path)
 
-        if formats == "graphml":
-            graphml_format(vertices_list, save_path)
-        elif formats == "g6":
-            graph6_format(vertices_list, save_path)
-        else:
-            print("No Format found")
-            return -1
 
         # display all windows until key is pressed
         cv.waitKey(0)
