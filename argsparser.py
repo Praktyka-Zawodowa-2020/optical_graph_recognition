@@ -6,7 +6,7 @@ def parse_argument(args) -> (str, int):
     file_path = parse_path(args.path)
     mode = parse_background(args.background)
 
-    return Mode.PRINTED, file_path
+    return mode, file_path
 
 
 def parse_path(file_path: str) -> str:
