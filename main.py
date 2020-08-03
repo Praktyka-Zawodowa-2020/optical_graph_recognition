@@ -33,32 +33,32 @@ def load_image(file_index):
     return source
 
 
-def parse_argument(file_path: str) -> str:
+def parse_argument(file_path: str) -> (int,str):
     file_path.replace(" ", "")
     if 1 < file_path.count('.') < 0:
         print("File path is incorrect. Must be only one dot.")
-        return ''
+        return 1,"File path is incorrect. Must be only one dot."
     head, tail = os.path.split(file_path)
     if len(tail) == 0:
         print("File name no exist")
-        return ''
+        return 1,'1: File name no exist'
 
     file_name, file_ext = os.path.splitext(tail)
     if len(file_name) == 0:
         print("File name not found")
-        return ''
+        return 1,'1: File name not found'
     save_path = head + '/' + file_name
-    return save_path
+    return 0,save_path
 
 
 def main(args=None):
     # source = load_image(file_index=0)
     args = parser.parse_args()
     file_path = args.path
-    save_path = parse_argument(file_path)
+    code,save_path = parse_argument(file_path)
 
-    if len(save_path) == 0:
-        return -1
+    if code == 1:
+        return save_path
 
     source = cv.imread(file_path)
     if source is not None:  # read successful, process image
@@ -68,7 +68,7 @@ def main(args=None):
         vertices_list, visualised = segment(source, binary, preprocessed, False)
         if len(vertices_list) == 0:
             print("No vertices found")
-            return -1
+            return "1: No vertices found"
 
         vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
         graphml_format(vertices_list, save_path)
@@ -76,10 +76,11 @@ def main(args=None):
 
 
         # display all windows until key is pressed
-        cv.waitKey(0)
+        #cv.waitKey(0)
+        return "0"
     else:
         print("Error opening image!")
-        return -1
+        return "1: Error opening image!"
 
 
 if __name__ == "__main__":
