@@ -23,12 +23,8 @@ parser.add_argument("-b", "--background",
 
 
 def main(args=None):
-    # source = load_image(file_index=0)
-
     args = parser.parse_args()
-
-    file_path = args.path
-    mode, save_path = parse_argument(args)
+    mode, file_path, save_path = parse_argument(args)
 
     if mode == -1 or len(save_path) == 0:
         return -1

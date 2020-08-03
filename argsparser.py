@@ -2,11 +2,11 @@ import os
 from shared import Mode
 
 
-def parse_argument(args) -> (str, int):
-    file_path = parse_path(args.path)
+def parse_argument(args) -> (int, str, str):
+    save_path = parse_path(args.path)
     mode = parse_background(args.background)
 
-    return mode, file_path
+    return mode, args.path, save_path
 
 
 def parse_path(file_path: str) -> str:
