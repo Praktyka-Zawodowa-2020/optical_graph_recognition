@@ -5,7 +5,7 @@ import numpy as np
 from math import ceil, floor, sqrt
 from Vertex import Vertex
 # Below are constants for HoughCircles function
-from shared import Color, Kernel
+from shared import Color, Kernel, Mode
 
 MAX_R_FACTOR: float = 0.035
 MIN_R_FACTOR: float = 0.005
@@ -28,7 +28,7 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
     :return vertices_list: list of detected Vertices (objects of Vertex class) and visualised results of detection
     """
     # fill unfilled vertices
-    filled = fill_vertices(preprocessed)
+    filled = fill_vertices(preprocessed, Mode.PRINTED)
 
     # remove edges
     edgeless = remove_edges(filled)
@@ -45,13 +45,23 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
     return vertices_list, visualised
 
 
-def fill_vertices(image: np.ndarray) -> np.ndarray:
+def fill_vertices(image: np.ndarray, mode: Mode) -> np.ndarray:
     """
-    Detect unfilled vertices in preprocessed image. Return image with vertices filled with object color (white)
+    Detect unfilled vertices in preprocessed image
+    Return image with vertices filled with object color
 
     :param image: preprocessed image
+    :param mode: input mode, see shared.py for more info
     :return image: image with filled vertices
     """
+
+    if mode == Mode.PRINTED:
+        image = fill_elliptical_contours(image, 0.6, 1.25)
+    elif mode == Mode.CLEAN_BG:
+        image = fill_elliptical_contours(image, 0.3)
+    elif mode == Mode.GRID_BG:
+        image = fill_elliptical_contours(image, 0.35)
+
     input_width = image.shape[1]
     # detect unfilled circles with Hough circles transform (parametrized based on image width)
     unfilled_v = cv.HoughCircles(
@@ -74,6 +84,54 @@ def fill_vertices(image: np.ndarray) -> np.ndarray:
     image = cv.morphologyEx(image, cv.MORPH_CLOSE, Kernel.k7)
 
     return image
+
+
+def fill_elliptical_contours(image: np.ndarray, threshold: float = 0.5, round_ratio: float = 4.0) -> np.ndarray:
+    """
+    Fill elliptical inner contours which are treated as vertices
+
+    :param image: input image
+    :param threshold: value from 0 to 1 - the bigger the more elliptical vertices should be to be filled
+    :param round_ratio: major axis to minor axis ratio (1; inf) -  the less the more round vertices should be
+    :return: image with filled elliptical vertices
+    """
+    processed = cv.morphologyEx(image, cv.MORPH_CLOSE, Kernel.k3, iterations=4)  # fill small gaps and close contours
+    # find contours in 2 level hierarchy: inner and outer contours - inner contours in parent field have non -1 value
+    contours, hierarchy = cv.findContours(processed, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+    original = image.copy()
+    img_area = image.shape[0] * image.shape[1]
+
+    for i in range(0, len(contours)):
+        # check for a contour parent (indicates being inner contour), also filter to big and to small contours
+        if hierarchy[0][i][3] != -1 and img_area * 0.1 >= cv.contourArea(contours[i]) >= img_area * 0.0001:
+            (x, y), (a, b), angle = cv.minAreaRect(contours[i])  # rotated bounding rect describe fitted ellipse
+            if round_ratio >= a/b >= 1.0/round_ratio:  # check if fitted ellipse is round enough to be a vertex
+                ellipse_cnt = cv.ellipse2Poly((int(x), int(y)), (int(a / 2.0), int(b / 2.0)), int(angle), 0, 360, 1)
+                overlap_level = contours_overlap_level(ellipse_cnt, contours[i])
+                if overlap_level >= threshold:  # if ellipse and inner contour overlap enough then fill vertex (contour)
+                    cv.drawContours(original, contours, i, Color.OBJECT, thickness=cv.FILLED)
+    return original
+
+
+def contours_overlap_level(contour1, contour2):
+    """
+    Calculate overlap level of two contours
+
+    :param contour1: for each pixel of this contour minimal distance to second contour will be calculated
+    :param contour2: second contour
+    :return: overlap level in range (0;1) - 0 indicating no overlapping and 1 indicating full overlapping
+    """
+    # if contour is big enough then overlaying limit is 1 pixel, otherwise for small contours it is 0 (exact overlay)
+    dist_limit = 1 if cv.contourArea(contour1) >= 150 else 0
+    overlaying_pixels = 0
+    for i in range(0, len(contour1)):
+        x, y = contour1[i]
+        dist = abs(cv.pointPolygonTest(contour2, (x, y), True))
+        if dist <= dist_limit:  # contour pixels are considered overlaying if they are distant not more than limit
+            overlaying_pixels += 1
+    overlay_level = overlaying_pixels / float(len(contour1))  # calculate overlaying to all pixels in contour ratio
+
+    return overlay_level
 
 
 def remove_edges(image: np.ndarray) -> np.ndarray:
