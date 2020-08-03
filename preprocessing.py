@@ -24,12 +24,13 @@ MAX_FILL_RATIO: float = 0.14  # ratio of object pixels to all pixels
 NOISE_FACTOR: float = 0.0001  # px^2
 
 
-def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndarray, np.ndarray):
+def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarray, np.ndarray, np.ndarray):
     """
     Processes source image by reshaping, thresholding, transforming and cropping.
 
     :param source: input image
     :param imshow_enabled: flag determining to display (or not) preprocessing steps
+    :param mode: GRID_BG, CLEAN_BG, PRINTED
     :return: reshaped, binarized, and fully preprocessed images.
     """
     # Reshape image to standard resolution
@@ -42,7 +43,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool) -> (np.ndarray, np.ndar
     binary, threshold_value = threshold(gray, MIN_BRIGHT_VAL, MAX_FILL_RATIO)
 
     # Transform image (filter noise, remove grid, ...)
-    transformed = transform(binary, threshold_value, Mode.CLEAN_BG)  # TODO - mode from command line
+    transformed = transform(binary, threshold_value, mode)
 
     # Remove unnecessary background
     transformed, [reshaped, binary] = crop_bg_padding(transformed, [reshaped, binary])
@@ -126,7 +127,7 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
     return binary, threshold_value
 
 
-def transform(binary_image: np.ndarray, thresh_val: int, mode: Mode) -> np.ndarray:
+def transform(binary_image: np.ndarray, thresh_val: int, mode: int) -> np.ndarray:
     """
     Filter image from noise (and sometimes grid) by performing various transformations depending on mode parameter.
 

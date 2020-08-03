@@ -17,7 +17,7 @@ CIRCLE_THRESHOLD: int = 13
 COLOR_R_FACTOR: float = 0.5  # Should be < 1.0
 
 
-def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool) -> [list, np.ndarray]:
+def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool, mode: int) -> [list, np.ndarray]:
     """
     Detect vertices in preprocessed image and return them in a list
 
@@ -25,10 +25,12 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
     :param binary: binarized image from preprocessing phase
     :param preprocessed: fully preprocessed image
     :param imshow_enabled: flag determining to display (or not) segmentation steps
+   :param mode: GRID_BG, CLEAN_BG, PRINTED
     :return vertices_list: list of detected Vertices (objects of Vertex class) and visualised results of detection
+
     """
     # fill unfilled vertices
-    filled = fill_vertices(preprocessed, Mode.PRINTED)
+    filled = fill_vertices(preprocessed, mode)
 
     # remove edges
     edgeless = remove_edges(filled)
@@ -45,7 +47,7 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
     return vertices_list, visualised
 
 
-def fill_vertices(image: np.ndarray, mode: Mode) -> np.ndarray:
+def fill_vertices(image: np.ndarray, mode: int) -> np.ndarray:
     """
     Detect unfilled vertices in preprocessed image
     Return image with vertices filled with object color
