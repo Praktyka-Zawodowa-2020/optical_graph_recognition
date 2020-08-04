@@ -24,7 +24,7 @@ MAX_FILL_RATIO: float = 0.14  # ratio of object pixels to all pixels
 NOISE_FACTOR: float = 0.0001  # px^2
 
 
-def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarray, np.ndarray, np.ndarray):
+def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int,i) -> (np.ndarray, np.ndarray, np.ndarray):
     """
     Processes source image by reshaping, thresholding, transforming and cropping.
 
@@ -35,6 +35,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarr
     """
     # Reshape image to standard resolution
     reshaped = reshape(source, WIDTH_LIM, HEIGHT_LIM)
+    cv.imwrite("./tests/" + str(i) + "bsource.jpg", reshaped)
 
     # Convert image to gray scale
     gray = cv.cvtColor(reshaped, cv.COLOR_BGR2GRAY)

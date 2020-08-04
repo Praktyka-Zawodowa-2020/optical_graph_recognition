@@ -12,7 +12,7 @@ VERTEX_AREA_FACTOR: float = 1.6
 WITHIN_R_FACTOR: float = 3.4
 
 
-def recognize_topology(vertices_list: list, preprocessed: np.ndarray, visualised: np.ndarray, imshow_enabled: bool) \
+def recognize_topology(vertices_list: list, preprocessed: np.ndarray, visualised: np.ndarray, imshow_enabled: bool,i) \
         -> list:
     """
     Remove vertices from image, and based on remaining contours detect edges that connect those vertices.
@@ -27,7 +27,7 @@ def recognize_topology(vertices_list: list, preprocessed: np.ndarray, visualised
     preprocessed, topology_backend = remove_vertices(vertices_list, preprocessed, visualised)
 
     vertices_list, topology_backend, visualised = find_edges(vertices_list, preprocessed, topology_backend, visualised)
-
+    cv.imwrite("./tests/"+str(i)+"reco.jpg",visualised)
     if imshow_enabled:
         cv.imshow("removed vertices", preprocessed)
         cv.imshow("topology backend: search areas and approx. edges", topology_backend)
