@@ -41,9 +41,6 @@ def segment(source: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool, 
     # remove edges
     edgeless = remove_edges(filled)
 
-    # filled hole in edges
-    edgeless = filling_holles(edgeless)
-
     # detect vertices
     if mode == Mode.PRINTED:
         vertices_list, visualised, preprocessed = find_vertices(source, preprocessed, edgeless, 1.5, 0.55)
@@ -227,96 +224,61 @@ def fill_small_contours(image: np.ndarray, max_area_factor: float) -> np.ndarray
 
     for i in range(0, len(contours)):
         # fill only small inner contours
-        if hierarchy[0][i][3] != -1 and cv.contourArea(contours[i]) <= image.shape[0] * image.shape[1] * max_area_factor:
+        if hierarchy[0][i][3] != -1 and \
+                cv.contourArea(contours[i]) <= image.shape[0] * image.shape[1] * max_area_factor:
             cv.drawContours(image, contours, i, Color.OBJECT, thickness=cv.FILLED)
     return image
 
 
 def remove_edges(image: np.ndarray) -> np.ndarray:
     """
-    Remove graph edges by performing erosion and dilation K times (also removes noise if some remained)
+    Remove graph edges by performing erosion and dilation K times.
+    K is found by finding the beginning of the longest series of constant number of contours
+    remaining after successive erosions
 
     :param image: preprocessed image with filled vertices
     :return dilated: image without edges (only vertices pixels)
     """
-    kernel = Kernel.k3
+    eroded_contours = image.copy()
     eroded = image.copy()
-    contours, _ = cv.findContours(eroded, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    start, before = len(contours), len(contours)
-    K, counter = 0, 0
     contours_list = []
-    value = 0
-    # eroding k times
+
+    # Calculation of the number of contours after successive erosions
     while True:
-        i = len(contours)
-        contours_list.append(i)
-        if i == before and before != start:
-            counter = counter + 1
-        else:
-            counter = 0
-
-        if start != i:
-            start = 0
-        if counter == 1:
-            if value==0:
-                value = K+1
-        eroded = cv.erode(eroded, kernel, iterations=1)
-        K = K + 1
-        contours, _ = cv.findContours(eroded, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-        before = i
-
+        contours, _ = cv.findContours(eroded_contours, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         if len(contours) == 0:
             break
 
-    eroded = cv.erode(eroded, kernel, iterations=1)
-    K = K + 1
+        contours_list.append(len(contours))
+        eroded_contours = cv.erode(eroded_contours, Kernel.k3, iterations=1)
 
-    eroded2 = image.copy()
-
-    poprzednie = contours_list[0]
-    maximum = 0
-    aktualne = 0
-    pozycja_max = 0
-    pozycja_aktualna = 0
-    k = 0
+    # Look for the position with the longest string where the number of contours is constant
+    # We assume that the sequence is constant when the number of contours differs at most by 1 from the previous number
+    before_number = contours_list[0]
+    maximum, actual, position_max, current_position, counter = 0, 0, 0, 0, 0
 
     for i in contours_list:
-        if abs(poprzednie - i) <= 1:
-            if aktualne == 0:
-                pozycja_aktualna = k
-            aktualne += 1
+        if abs(before_number - i) <= 1:
+            if actual == 0:
+                current_position = counter
+            actual += 1
         else:
-            if maximum < aktualne:
-                pozycja_max = pozycja_aktualna
-                maximum = aktualne
-            aktualne = 0
-        poprzednie = i
+            if maximum < actual:
+                position_max = current_position
+                maximum = actual
+            actual = 0
+        before_number = i
+        counter += 1
 
-        k += 1
-    if pozycja_max==0:
-        pozycja_max=pozycja_aktualna
-    print(contours_list, pozycja_max, value)
+    if position_max == 0:
+        position_max = current_position
 
-    eroded2 = cv.erode(eroded2, kernel, iterations=pozycja_max)
-
-
+    K = position_max
+    # eroded k times
+    eroded = cv.erode(eroded, Kernel.k3, iterations=K)
     # dilating k times
-    dilated = cv.dilate(eroded2, kernel, iterations=pozycja_max)
+    dilated = cv.dilate(eroded, Kernel.k3, iterations=K)
     return dilated
-
-
-def filling_holles(image: np.ndarray) -> np.ndarray:
-    image_floodfill = image.copy()
-
-    # Mask used to flood filling.
-    # Notice the size needs to be 2 pixels than the image.
-    h, w = image.shape[:2]
-    mask = np.zeros((h + 2, w + 2), np.uint8)
-    cv.floodFill(image_floodfill, mask, (0, 0), 255)
-    image_floodfill_inv = cv.bitwise_not(image_floodfill)
-    image = image | image_floodfill_inv
-    return image
-
 
 
 def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.ndarray,
@@ -346,13 +308,14 @@ def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.nda
             x, y, w, h = cv.boundingRect(cnt)
             if 1.0 / round_ratio <= h / w <= round_ratio:  # circular enough contours
                 (x, y), r = cv.minEnclosingCircle(cnt)
-                x, y, r = (int(x), int(y), int(r*1.05))
+                x, y, r = (int(x), int(y), int(r * 1.05))
 
                 fill_ratio = circle_fill_ratio(edgeless, x, y, r)
                 if fill_ratio >= min_fill \
-                        and cv.contourArea(cnt) <= edgeless.shape[0]*edgeless.shape[1]*VERTEX_AREA_UPPER:
+                        and cv.contourArea(cnt) <= edgeless.shape[0] * edgeless.shape[1] * VERTEX_AREA_UPPER:
                     # determining vertex color
-                    color = vertex_binary_color(cv.medianBlur(preprocessed, 5), x, y, r, COLOR_R_FACTOR,COLOR_THRESHOLD)
+                    color = vertex_binary_color(cv.medianBlur(preprocessed, 5), x, y, r, COLOR_R_FACTOR,
+                                                COLOR_THRESHOLD)
 
                     vertices_list.append(Vertex(x, y, r, color))  # creating Vertex from calculated data
                     # creating visual representation of detected vertices

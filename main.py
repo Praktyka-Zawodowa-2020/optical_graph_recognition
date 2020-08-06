@@ -1,7 +1,5 @@
 import os
 import sys
-
-
 import cv2 as cv
 from argsparser import parser, parse_argument
 from preprocessing import preprocess

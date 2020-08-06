@@ -17,6 +17,12 @@ parser.add_argument("-b", "--background",
 
 
 def parse_argument(args) -> (int, str, str):
+    """
+    Parses the command line arguments
+
+    :param: args: Comand line arguments
+    :return: mode, path to photo, path to save the result
+    """
     save_path = parse_path(args.path)
     mode = Mode.get_mode(args.background)
 
@@ -24,6 +30,13 @@ def parse_argument(args) -> (int, str, str):
 
 
 def parse_path(file_path: str) -> str:
+    """
+    Checks the path to the photo and specifies the path to save
+
+    :param: file_path: path to photo
+    :return: path to save the result
+
+    """
     file_path.replace(" ", "")
     if file_path.count('.') != 1:
         print("1: File path is incorrect. Must be only one dot.")
