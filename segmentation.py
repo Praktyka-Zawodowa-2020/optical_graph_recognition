@@ -17,7 +17,8 @@ CIRCLE_THRESHOLD: int = 13
 COLOR_R_FACTOR: float = 0.5  # Should be < 1.0
 
 
-def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool, mode: int,i) -> [list, np.ndarray]:
+def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool, mode: int, i) -> [
+    list, np.ndarray]:
     """
     Detect vertices in preprocessed image and return them in a list
 
@@ -35,6 +36,10 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
     # remove edges
     edgeless = remove_edges(filled)
 
+    # filled hole in edges
+    edgeless = filling_holles(edgeless)
+    cv.imwrite("./tests/" + str(i) + "holes.jpg", edgeless)
+
     # detect vertices
     vertices_list, visualised = find_vertices(source, binary, edgeless)
 
@@ -42,7 +47,7 @@ def segment(source: np.ndarray, binary: np.ndarray, preprocessed: np.ndarray, im
     if imshow_enabled:
         cv.imshow("filled", filled)
         cv.imshow("edgeless", edgeless)
-        cv.imshow(str(len(vertices_list))+" detected vertices", visualised)
+        cv.imshow(str(len(vertices_list)) + " detected vertices", visualised)
 
     return vertices_list, visualised
 
@@ -75,12 +80,12 @@ def fill_vertices(image: np.ndarray, mode: int) -> np.ndarray:
         maxRadius=ceil(input_width * MAX_R_FACTOR)
     )
     # Filling detected areas (circles)
-    if unfilled_v is not None:
-        circles = np.uint16(np.around(unfilled_v))
-        for i in circles[0, :]:
-            center = (i[0], i[1])
-            radius = i[2]
-            cv.circle(image, center, round(radius), Color.OBJECT, thickness=cv.FILLED, lineType=8, shift=0)
+    # if unfilled_v is not None:
+    #     circles = np.uint16(np.around(unfilled_v))
+    #     for i in circles[0, :]:
+    #         center = (i[0], i[1])
+    #         radius = i[2]
+    #         cv.circle(image, center, round(radius), Color.OBJECT, thickness=cv.FILLED, lineType=8, shift=0)
 
     # Vertices are not perfect circles so after circle fill we fill small gaps inside vertices with closing operation
     image = cv.morphologyEx(image, cv.MORPH_CLOSE, Kernel.k7)
@@ -107,11 +112,12 @@ def fill_elliptical_contours(image: np.ndarray, threshold: float = 0.5, round_ra
         # check for a contour parent (indicates being inner contour), also filter to big and to small contours
         if hierarchy[0][i][3] != -1 and img_area * 0.1 >= cv.contourArea(contours[i]) >= img_area * 0.0001:
             (x, y), (a, b), angle = cv.minAreaRect(contours[i])  # rotated bounding rect describe fitted ellipse
-            if round_ratio >= a/b >= 1.0/round_ratio:  # check if fitted ellipse is round enough to be a vertex
+            if round_ratio >= a / b >= 1.0 / round_ratio:  # check if fitted ellipse is round enough to be a vertex
                 ellipse_cnt = cv.ellipse2Poly((int(x), int(y)), (int(a / 2.0), int(b / 2.0)), int(angle), 0, 360, 1)
                 overlap_level = contours_overlap_level(ellipse_cnt, contours[i])
                 if overlap_level >= threshold:  # if ellipse and inner contour overlap enough then fill vertex (contour)
                     cv.drawContours(original, contours, i, Color.OBJECT, thickness=cv.FILLED)
+                    # cv.circle(original, (round(x),round(y)), 10, Color.OBJECT, thickness=cv.FILLED, lineType=8, shift=0)
     return original
 
 
@@ -148,19 +154,22 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     contours, _ = cv.findContours(eroded, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
     start, before = len(contours), len(contours)
     K, counter = 0, 0
-
+    contours_list = []
+    value = 0
     # eroding k times
     while True:
         i = len(contours)
+        contours_list.append(i)
         if i == before and before != start:
-            counter = counter+1
+            counter = counter + 1
         else:
             counter = 0
 
         if start != i:
             start = 0
         if counter == 1:
-            break
+            if value==0:
+                value = K+1
         eroded = cv.erode(eroded, kernel, iterations=1)
         K = K + 1
         contours, _ = cv.findContours(eroded, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
@@ -170,11 +179,52 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
             break
 
     eroded = cv.erode(eroded, kernel, iterations=1)
-    K = K+1
+    K = K + 1
+
+    eroded2 = image.copy()
+
+    poprzednie = contours_list[0]
+    maximum = 0
+    aktualne = 0
+    pozycja_max = 0
+    pozycja_aktualna = 0
+    k = 0
+
+    for i in contours_list:
+        if abs(poprzednie - i) <= 1:
+            if aktualne == 0:
+                pozycja_aktualna = k
+            aktualne += 1
+        else:
+            if maximum < aktualne:
+                pozycja_max = pozycja_aktualna
+                maximum = aktualne
+            aktualne = 0
+        poprzednie = i
+
+        k += 1
+    if pozycja_max==0:
+        pozycja_max=pozycja_aktualna
+    print(contours_list, pozycja_max, value)
+
+    eroded2 = cv.erode(eroded2, kernel, iterations=pozycja_max)
 
     # dilating k times
-    dilated = cv.dilate(eroded, kernel, iterations=K)
+    dilated = cv.dilate(eroded2, kernel, iterations=pozycja_max)
     return dilated
+
+
+def filling_holles(image: np.ndarray) -> np.ndarray:
+    image_floodfill = image.copy()
+
+    # Mask used to flood filling.
+    # Notice the size needs to be 2 pixels than the image.
+    h, w = image.shape[:2]
+    mask = np.zeros((h + 2, w + 2), np.uint8)
+    cv.floodFill(image_floodfill, mask, (0, 0), 255)
+    image_floodfill_inv = cv.bitwise_not(image_floodfill)
+    image = image | image_floodfill_inv
+    return image
 
 
 def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) -> (list, np.ndarray):
@@ -200,7 +250,7 @@ def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) 
 
         # calculating r
         dist = np.sqrt(np.sum(np.power(cnt - (x, y), 2), 1))  # distance from the center pixel for each pixel in contour
-        r_original = (3*np.max(dist) + np.average(dist))/4.0
+        r_original = (3 * np.max(dist) + np.average(dist)) / 4.0
         r_final = round(r_original * 1.25)  # we take a bit bigger r to ensure that vertex is inside circle area
 
         # determining vertex color
@@ -211,7 +261,7 @@ def find_vertices(source: np.ndarray, binary: np.ndarray, edgeless: np.ndarray) 
 
         # creating visual representation of detected vertices
         thickness = cv.FILLED if color == Color.OBJECT else 2
-        cv.circle(visualized, (x, y), r_final, Color.GREEN, thickness, 8, 0)
+        cv.circle(visualized, (x, y), r_final, Color.GREEN, 2, 8, 0)
         # cv.putText(visualized, str(i), (x, y), cv.QT_FONT_NORMAL, 0.75, Color.WHITE)
 
     return vertices_list, visualized
@@ -241,7 +291,7 @@ def determine_binary_color(binary: np.ndarray, x: int, y: int, r_original: float
         bg_count = 0
         for y_iter in range(top, bottom):
             for x_iter in range(left, right):
-                distance = round(sqrt((x-x_iter)**2+(y-y_iter)**2))
+                distance = round(sqrt((x - x_iter) ** 2 + (y - y_iter) ** 2))
                 if distance <= r:
                     if binary[y_iter, x_iter] == Color.OBJECT:
                         object_count += 1

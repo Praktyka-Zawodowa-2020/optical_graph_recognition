@@ -35,7 +35,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int,i) -> (np.nda
     """
     # Reshape image to standard resolution
     reshaped = reshape(source, WIDTH_LIM, HEIGHT_LIM)
-    cv.imwrite("./tests/" + str(i) + "bsource.jpg", reshaped)
+    # cv.imwrite("./tests/" + str(i) + "bsource.jpg", reshaped)
 
     # Convert image to gray scale
     gray = cv.cvtColor(reshaped, cv.COLOR_BGR2GRAY)
@@ -357,17 +357,17 @@ def crop_bg_padding(binary_transformed: np.ndarray, images: list, padding: int =
     return binary_transformed, images
 
 
-def delete_characters(transformed: np.ndarray) -> np.ndarray:
+def delete_characters(image: np.ndarray) -> np.ndarray:
     """
     Remove "characters" (noise) of small sizes
 
     :param image: Image after binarization
     :return: Image without noise
     """
-    image = transformed.copy()
-    height, width = image.shape[:2]
+    image_copy = image.copy()
+    height, width = image_copy.shape[:2]
 
-    contours, hierarchy = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv.findContours(image_copy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
     for contour in contours:
         wider_clipping = False
@@ -382,7 +382,7 @@ def delete_characters(transformed: np.ndarray) -> np.ndarray:
             w = w + 4
             h = h + 4
             wider_clipping = True
-        crop_image = image[y: y + h, x: x + w].copy()
+        crop_image = image_copy[y: y + h, x: x + w].copy()
 
         # if empty vertices of the graph have a thick edge,
         # the findContours function draws the contours inside and outside the vertex.
@@ -434,6 +434,6 @@ def delete_characters(transformed: np.ndarray) -> np.ndarray:
                     hist2 = cv.calcHist([sub_image], [0], None, [256], [0, 256])
 
                 if (is_edge is True and hist2[255] / (hist2[255] + hist2[0]) > 0.08) or is_edge is False:
-                    cv.drawContours(image, [contour], -1, 0, -1)
+                    cv.drawContours(image_copy, [contour], -1, 0, -1)
 
-    return image
+    return image_copy

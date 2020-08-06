@@ -25,7 +25,7 @@ parser.add_argument("-b", "--background",
 
 def main(args=None):
     # source = load_image(file_index=0)
-    for i in range(74, 75):
+    for i in range(1, 165):
         if i < 10:
             print("article", i, " ", i, end=" ")
             source = cv.imread("./article/0" + str(i) + ".jpg")
@@ -59,11 +59,11 @@ def main(args=None):
                 print("No vertices found")
                 return -1
             vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False,i)
-            graphml_format(vertices_list, "./tests/74")
-            graph6_format(vertices_list, "./tests/74")
+            # graphml_format(vertices_list, "./tests/74")
+            # graph6_format(vertices_list, "./tests/74")
         # cv.imshow("source", source)
         # display all windows until key is pressed
-        # cv.waitKey(0)
+            cv.waitKey(0)
         else:
             print("Error opening image!")
             return -1

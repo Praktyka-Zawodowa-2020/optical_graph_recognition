@@ -27,7 +27,9 @@ def recognize_topology(vertices_list: list, preprocessed: np.ndarray, visualised
     preprocessed, topology_backend = remove_vertices(vertices_list, preprocessed, visualised)
 
     vertices_list, topology_backend, visualised = find_edges(vertices_list, preprocessed, topology_backend, visualised)
-    cv.imwrite("./tests/"+str(i)+"reco.jpg",visualised)
+    #cv.imwrite("./tests/"+str(i)+"pre.jpg",preprocessed)
+    #cv.imwrite("./tests/"+str(i)+"topo.jpg",topology_backend)
+    #cv.imwrite("./tests/"+str(i)+"reco.jpg",visualised)
     if imshow_enabled:
         cv.imshow("removed vertices", preprocessed)
         cv.imshow("topology backend: search areas and approx. edges", topology_backend)
