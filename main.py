@@ -24,49 +24,36 @@ parser.add_argument("-b", "--background",
 
 
 def main(args=None):
-    # source = load_image(file_index=0)
-    for i in range(1, 165):
-        if i < 10:
-            print("article", i, " ", i, end=" ")
-            source = cv.imread("./article/0" + str(i) + ".jpg")
-            mode=Mode.PRINTED
-        elif i <= 50:
-            print("article", i, " ", i, end=" ")
-            source = cv.imread("./article/" + str(i) + ".jpg")
-            mode = Mode.PRINTED
-        elif 50 < i < 60:
-            print("board", i-50, " ", i, end=" ")
-            source = cv.imread("./board/0" + str(i-50) + ".jpg")
-            mode = Mode.CLEAN_BG
-        elif 60 <= i < 103:
-            print("board", i-50, " ", i, end=" ")
-            source = cv.imread("./board/" + str(i-50) + ".jpg")
-            mode = Mode.CLEAN_BG
-        elif 103 <= i < 152:
-            print("notebook", i-102, " ", i, end=" ")
-            source = cv.imread("./notebook/" + str(i-102) + ".jpg")
-            mode = Mode.GRID_BG
-        else:
-            print("paint", i - 151, " ", i, end=" ")
-            source = cv.imread("./paint/" + str(i - 151) + ".jpg")
-            mode = Mode.CLEAN_BG
+    args = parser.parse_args()
+    mode, file_path, save_path = parse_argument(args)
 
-        if source is not None:  # read successful, process image
-            file_name = str(i) + ".jpg"
-            source, binary, preprocessed = preprocess(source, False,mode,i)
-            vertices_list, visualised = segment(source, binary, preprocessed, False,mode,i)
-            if len(vertices_list) == 0:
-                print("No vertices found")
-                return -1
-            vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False,i)
-            # graphml_format(vertices_list, "./tests/74")
-            # graph6_format(vertices_list, "./tests/74")
-        # cv.imshow("source", source)
-        # display all windows until key is pressed
-            cv.waitKey(0)
-        else:
-            print("Error opening image!")
+    if mode == -1 or len(save_path) == 0:
+        return -1
+
+    source = cv.imread(file_path)
+    if source is not None:  # read successful, process image
+
+        # 1st step - preprocessing
+        source, preprocessed = preprocess(source, False, mode)
+
+        # 2nd step - segmentation
+        vertices_list, visualised, preprocessed = segment(source, preprocessed, False, mode)
+        if len(vertices_list) == 0:
+            print("1: No vertices found")
             return -1
+
+        # 3rd step - topology recognition
+        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, True)
+
+        # 4th step - postprocessing
+        graphml_format(vertices_list, save_path)
+        graph6_format(vertices_list, save_path)
+
+        print("0")
+        return 0
+    else:
+        print("1: Error opening image!")
+        return -1
 
 
 if __name__ == "__main__":
