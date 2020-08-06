@@ -38,7 +38,6 @@ def segment(source: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool, 
     """
     # fill unfilled vertices
     filled = fill_vertices(preprocessed, mode)
-
     # remove edges
     edgeless = remove_edges(filled)
 
@@ -79,6 +78,7 @@ def fill_vertices(image: np.ndarray, mode: int) -> np.ndarray:
         image = fill_elliptical_contours(image, 0.3, round_factor)
         image = fill_circular_shapes(image, 13, round_factor)
     elif mode == Mode.GRID_BG:
+
         round_factor = 2.5
         image = fill_elliptical_contours(image, 0.35, round_factor)
         image = fill_circular_shapes(image, 13, round_factor)
@@ -117,6 +117,7 @@ def fill_elliptical_contours(image: np.ndarray, threshold: float = 0.5, round_ra
                 overlap_level = contours_overlap_level(ellipse_cnt, contours[i])
                 if overlap_level >= threshold:  # if ellipse and inner contour overlap enough then fill vertex (contour)
                     cv.drawContours(original, contours, i, Color.OBJECT, thickness=cv.FILLED)
+
             else:  # removing contours not meeting roundness condition
                 cv.drawContours(original, contours, i, Color.BG, thickness=6)
 
@@ -223,49 +224,60 @@ def fill_small_contours(image: np.ndarray, max_area_factor: float) -> np.ndarray
 
     for i in range(0, len(contours)):
         # fill only small inner contours
-        if hierarchy[0][i][3] != -1 and cv.contourArea(contours[i]) <= image.shape[0] * image.shape[1] * max_area_factor:
+        if hierarchy[0][i][3] != -1 and \
+                cv.contourArea(contours[i]) <= image.shape[0] * image.shape[1] * max_area_factor:
             cv.drawContours(image, contours, i, Color.OBJECT, thickness=cv.FILLED)
     return image
 
 
 def remove_edges(image: np.ndarray) -> np.ndarray:
     """
-    Remove graph edges by performing erosion and dilation K times (also removes noise if some remained)
+    Remove graph edges by performing erosion and dilation K times.
+    K is found by finding the beginning of the longest series of constant number of contours
+    remaining after successive erosions
 
     :param image: preprocessed image with filled vertices
     :return dilated: image without edges (only vertices pixels)
     """
-    kernel = Kernel.k3
+    eroded_contours = image.copy()
     eroded = image.copy()
-    contours, _ = cv.findContours(eroded, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    start, before = len(contours), len(contours)
-    K, counter = 0, 0
+    contours_list = []
 
-    # eroding k times
+    # Calculation of the number of contours after successive erosions
     while True:
-        i = len(contours)
-        if i == before and before != start:
-            counter = counter + 1
-        else:
-            counter = 0
-
-        if start != i:
-            start = 0
-        if counter == 1:
-            break
-        eroded = cv.erode(eroded, kernel, iterations=1)
-        K = K + 1
-        contours, _ = cv.findContours(eroded, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-        before = i
-
+        contours, _ = cv.findContours(eroded_contours, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         if len(contours) == 0:
             break
 
-    eroded = cv.erode(eroded, kernel, iterations=1)
-    K = K + 1
+        contours_list.append(len(contours))
+        eroded_contours = cv.erode(eroded_contours, Kernel.k3, iterations=1)
 
+    # Look for the position with the longest string where the number of contours is constant
+    # We assume that the sequence is constant when the number of contours differs at most by 1 from the previous number
+    before_number = contours_list[0]
+    maximum, actual, position_max, current_position, counter = 0, 0, 0, 0, 0
+
+    for i in contours_list:
+        if abs(before_number - i) <= 1:
+            if actual == 0:
+                current_position = counter
+            actual += 1
+        else:
+            if maximum < actual:
+                position_max = current_position
+                maximum = actual
+            actual = 0
+        before_number = i
+        counter += 1
+
+    if position_max == 0:
+        position_max = current_position
+
+    K = position_max
+    # eroded k times
+    eroded = cv.erode(eroded, Kernel.k3, iterations=K)
     # dilating k times
-    dilated = cv.dilate(eroded, kernel, iterations=K)
+    dilated = cv.dilate(eroded, Kernel.k3, iterations=K)
     return dilated
 
 
@@ -275,7 +287,6 @@ def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.nda
     """
     Finds vertices based on detected contours in the edgeless image. Return list of those vertices.
     For topology recognition purposes Delete shapes from preprocessed image, that are not round enough
-
     :param source: input image
     :param preprocessed: fully preprocessed image from preprocessing phase
     :param edgeless: preprocessed image with filled vertices and without edges
@@ -297,13 +308,14 @@ def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.nda
             x, y, w, h = cv.boundingRect(cnt)
             if 1.0 / round_ratio <= h / w <= round_ratio:  # circular enough contours
                 (x, y), r = cv.minEnclosingCircle(cnt)
-                x, y, r = (int(x), int(y), int(r*1.05))
+                x, y, r = (int(x), int(y), int(r * 1.05))
 
                 fill_ratio = circle_fill_ratio(edgeless, x, y, r)
                 if fill_ratio >= min_fill \
-                        and cv.contourArea(cnt) <= edgeless.shape[0]*edgeless.shape[1]*VERTEX_AREA_UPPER:
+                        and cv.contourArea(cnt) <= edgeless.shape[0] * edgeless.shape[1] * VERTEX_AREA_UPPER:
                     # determining vertex color
-                    color = vertex_binary_color(cv.medianBlur(preprocessed, 5), x, y, r, COLOR_R_FACTOR,COLOR_THRESHOLD)
+                    color = vertex_binary_color(cv.medianBlur(preprocessed, 5), x, y, r, COLOR_R_FACTOR,
+                                                COLOR_THRESHOLD)
 
                     vertices_list.append(Vertex(x, y, r, color))  # creating Vertex from calculated data
                     # creating visual representation of detected vertices
@@ -321,7 +333,6 @@ def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.nda
 def circle_fill_ratio(binary: np.ndarray, x: int, y: int, r: int) -> float:
     """
     Calculate what percent of circular area is filled with object color in binary image
-
     :param binary: binary input image
     :param x: x coordinate of circle center
     :param y: y coordinate of circle center
@@ -356,8 +367,6 @@ def vertex_binary_color(binary: np.ndarray, x: int, y: int, r: float, r_factor: 
     """
     Determine vertex color based on fill ratio inside vertex area
     Inner vertex area is created by multiplying radius by radius factor to exclude vertex border pixels
-
-
     :param binary: binary input image
     :param x: coordinate of vertex center
     :param y: coordinate of vertex center
