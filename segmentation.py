@@ -305,7 +305,6 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     return dilated
 
 
-
 def filling_holles(image: np.ndarray) -> np.ndarray:
     image_floodfill = image.copy()
 

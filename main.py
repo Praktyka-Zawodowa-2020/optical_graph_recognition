@@ -22,7 +22,7 @@ def main(args=None):
     if source is not None:  # read successful, process image
 
         # 1st step - preprocessing
-        source, preprocessed = preprocess(source, False, mode)
+        source, preprocessed, mode = preprocess(source, False, mode)
 
         # 2nd step - segmentation
         vertices_list, visualised, preprocessed = segment(source, preprocessed, False, mode)
@@ -31,7 +31,7 @@ def main(args=None):
             return -1
 
         # 3rd step - topology recognition
-        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, True)
+        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
 
         # 4th step - postprocessing
         graphml_format(vertices_list, save_path)

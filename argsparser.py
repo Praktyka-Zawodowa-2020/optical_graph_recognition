@@ -8,16 +8,17 @@ parser.add_argument("-b", "--background",
                     help='''
                             GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.) 
                             CLEAN_BG - Hand drawn on empty uniform color background 
-                            PRINTED - Printed 
+                            PRINTED - Printed (e.g. from paper, publication, book...)
+                            AUTO - Mode is chosen automatically
                         ''',
                     default='CLEAN_BG',
-                    choices=['CLEAN_BG', 'GRID_BG', 'PRINTED']
+                    choices=['CLEAN_BG', 'GRID_BG', 'PRINTED', 'AUTO']
                     )
 
 
 def parse_argument(args) -> (int, str, str):
     save_path = parse_path(args.path)
-    mode = parse_background(args.background)
+    mode = Mode.get_mode(args.background)
 
     return mode, args.path, save_path
 
@@ -39,14 +40,3 @@ def parse_path(file_path: str) -> str:
     save_path = head + '/' + file_name
     return save_path
 
-
-def parse_background(mode: str) -> int:
-    if mode == "GRID_BG":
-        return Mode.GRID_BG
-    elif mode == "CLEAN_BG":
-        return Mode.CLEAN_BG
-    elif mode == "PRINTED":
-        return Mode.PRINTED
-    else:
-        print("1: Mode not found")
-        return -1

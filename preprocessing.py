@@ -22,17 +22,19 @@ MIN_BRIGHT_VAL: int = 110  # bright image lower limit of pixel value
 MAX_FILL_RATIO: float = 0.14  # ratio of object pixels to all pixels
 # for contour noise filtering
 NOISE_FACTOR: float = 0.0001  # px^2
+# for automatic mode choice
+MODE_THRESHOLD: float = 10  # min average distance of bg pixels to object pixels to consider image background clean
 
 
-
-def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarray, np.ndarray):
+def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarray, np.ndarray, Mode):
     """
     Processes source image by reshaping, thresholding, transforming and cropping.
+    If auto mode has been selected, choose mode automatically
 
     :param source: input image
     :param imshow_enabled: flag determining to display (or not) preprocessing steps
     :param mode: GRID_BG, CLEAN_BG, PRINTED
-    :return: reshaped and fully preprocessed images.
+    :return: reshaped and fully preprocessed images, changed (if mode is AUTO) or unchanged mode
     """
     # Reshape image to standard resolution
     reshaped = reshape(source, WIDTH_LIM, HEIGHT_LIM)
@@ -44,6 +46,10 @@ def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarr
     # Threshold (binarize) image
     binary, threshold_value = threshold(gray, MIN_BRIGHT_VAL, MAX_FILL_RATIO)
 
+    # choose mode automatically if selected AUTO mode
+    if mode == Mode.AUTO:
+        mode = chose_mode(binary)
+
     # Transform image (filter noise, remove grid, ...)
     transformed = transform(binary, threshold_value, mode)
 
@@ -51,7 +57,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarr
     transformed, [reshaped, binary] = crop_bg_padding(transformed, [reshaped, binary])
 
     # Remove characters
-    without_chars = delete_characters(transformed)  # TODO - mode from command line
+    # without_chars = delete_characters(transformed)  # TODO - mode from command line
 
     # Display results of preprocessing steps
     if imshow_enabled:
@@ -60,7 +66,7 @@ def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarr
         cv.imshow("transformed", transformed)
         # cv.imshow("Chars deleted", without_chars)
 
-    return reshaped, transformed
+    return reshaped, transformed, mode
 
 
 def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
@@ -127,6 +133,21 @@ def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_rati
                                       sub_sign * 8)
 
     return binary, threshold_value
+
+
+def chose_mode(binary_image: np.ndarray) -> Mode:
+    """
+    Chose mode automatically based on average background pixel distance from object pixels
+    For pictures with grid distance is much smaller than when the picture has clean background
+    :param binary_image: input binary image
+    :return: input mode for further processing, see shared.py for modes descriptions
+    """
+    filtered = cv.medianBlur(binary_image, 3)
+    avg = avg_bg_distance(filtered)
+    if avg <= MODE_THRESHOLD:
+        return Mode.GRID_BG
+    else:
+        return Mode.CLEAN_BG
 
 
 def transform(binary_image: np.ndarray, thresh_val: int, mode: int) -> np.ndarray:
@@ -216,7 +237,6 @@ def filter_grid(binary_image: np.ndarray, min_distance: int, start_kernel: int, 
     return image
 
 
-#
 def avg_bg_distance(binary_image: np.ndarray) -> float:
     """
     Calculate average distance from background pixel to nearest object pixel
@@ -362,7 +382,7 @@ def delete_characters(image: np.ndarray) -> np.ndarray:
     """
     Remove "characters" (noise) of small sizes
 
-    :param image: Image after binarization
+    :param transformed: binarized and transformed input image
     :return: Image without noise
     """
     image_copy = image.copy()
