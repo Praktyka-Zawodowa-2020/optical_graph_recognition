@@ -8,6 +8,21 @@ class Mode:
     GRID_BG = 1     # Hand drawn on grid/lined piece of paper (grid/lined notebook etc.)
     CLEAN_BG = 2    # Hand drawn on empty uniform color background (on board, empty piece of paper, editor (paint))
     PRINTED = 3     # Printed (e.g. from paper, publication, book...)
+    AUTO = 4        # Automatically chosen mode based on average background distance to objects
+
+    @staticmethod
+    def get_mode(string):
+        if string == "GRID_BG":
+            return Mode.GRID_BG
+        elif string == "CLEAN_BG":
+            return Mode.CLEAN_BG
+        elif string == "PRINTED":
+            return Mode.PRINTED
+        elif string == "AUTO":
+            return Mode.AUTO
+        else:
+            print("1: Mode \""+string+"\" is not a viable mode.")
+            return -1
 
 
 class Color:
