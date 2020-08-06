@@ -1,5 +1,18 @@
 import os
 from shared import Mode
+import argparse
+
+parser = argparse.ArgumentParser("Optical graph recognition")
+parser.add_argument("-p", "--path", help="Path to file")
+parser.add_argument("-b", "--background",
+                    help='''
+                            GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.) 
+                            CLEAN_BG - Hand drawn on empty uniform color background 
+                            PRINTED - Printed 
+                        ''',
+                    default='CLEAN_BG',
+                    choices=['CLEAN_BG', 'GRID_BG', 'PRINTED']
+                    )
 
 
 def parse_argument(args) -> (int, str, str):
