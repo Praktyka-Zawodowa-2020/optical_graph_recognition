@@ -1,26 +1,14 @@
 import os
 import sys
 
-import argparse
+
 import cv2 as cv
-from argsparser import parse_argument
+from argsparser import parser, parse_argument
 from preprocessing import preprocess
 from segmentation import segment
 from topology_recognition import recognize_topology
 from postprocesing import graph6_format, graphml_format
 from shared import Mode
-
-parser = argparse.ArgumentParser("Optical graph recognition")
-parser.add_argument("-p", "--path", help="Path to file")
-parser.add_argument("-b", "--background",
-                    help='''
-                            GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.) 
-                            CLEAN_BG - Hand drawn on empty uniform color background 
-                            PRINTED - Printed 
-                        ''',
-                    default='CLEAN_BG',
-                    choices=['CLEAN_BG', 'GRID_BG', 'PRINTED']
-                    )
 
 
 def main(args=None):

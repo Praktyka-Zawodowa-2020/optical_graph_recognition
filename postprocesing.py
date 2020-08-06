@@ -1,6 +1,10 @@
 from Vertex import Vertex
 from typing import List
 from shared import Color
+<<<<<<< HEAD
+=======
+
+>>>>>>> 81628e1cc42e22a1d04d8b7a7b94be7c19b9fd99
 
 def graph6_format(vertex: List[Vertex], save_path: str):
     """
