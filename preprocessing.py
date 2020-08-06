@@ -24,14 +24,14 @@ MAX_FILL_RATIO: float = 0.14  # ratio of object pixels to all pixels
 NOISE_FACTOR: float = 0.0001  # px^2
 
 
-def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarray, np.ndarray, np.ndarray):
+def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarray, np.ndarray):
     """
     Processes source image by reshaping, thresholding, transforming and cropping.
 
     :param source: input image
     :param imshow_enabled: flag determining to display (or not) preprocessing steps
     :param mode: GRID_BG, CLEAN_BG, PRINTED
-    :return: reshaped, binarized, and fully preprocessed images.
+    :return: reshaped and fully preprocessed images.
     """
     # Reshape image to standard resolution
     reshaped = reshape(source, WIDTH_LIM, HEIGHT_LIM)
@@ -56,9 +56,9 @@ def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarr
         cv.imshow("reshaped source " + str(reshaped.shape[1]) + "x" + str(reshaped.shape[0]), reshaped)
         cv.imshow("binary, th=" + str(threshold_value), binary)
         cv.imshow("transformed", transformed)
-        cv.imshow("Chars deleted", without_chars)
+        # cv.imshow("Chars deleted", without_chars)
 
-    return reshaped, binary, without_chars
+    return reshaped, transformed
 
 
 def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):

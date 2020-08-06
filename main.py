@@ -1,25 +1,13 @@
 import os
 import sys
 
-import argparse
+
 import cv2 as cv
-from argsparser import parse_argument
+from argsparser import parser, parse_argument
 from preprocessing import preprocess
 from segmentation import segment
 from topology_recognition import recognize_topology
 from postprocesing import graph6_format, graphml_format
-
-parser = argparse.ArgumentParser("Optical graph recognition")
-parser.add_argument("-p", "--path", help="Path to file")
-parser.add_argument("-b", "--background",
-                    help='''
-                            GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.) 
-                            CLEAN_BG - Hand drawn on empty uniform color background 
-                            PRINTED - Printed 
-                        ''',
-                    default='CLEAN_BG',
-                    choices=['CLEAN_BG', 'GRID_BG', 'PRINTED']
-                    )
 
 
 def main(args=None):
@@ -32,19 +20,22 @@ def main(args=None):
     source = cv.imread(file_path)
     if source is not None:  # read successful, process image
 
-        source, binary, preprocessed = preprocess(source, False, mode)
+        # 1st step - preprocessing
+        source, preprocessed = preprocess(source, False, mode)
 
-        vertices_list, visualised = segment(source, binary, preprocessed, False, mode)
+        # 2nd step - segmentation
+        vertices_list, visualised, preprocessed = segment(source, preprocessed, False, mode)
         if len(vertices_list) == 0:
             print("1: No vertices found")
             return -1
 
-        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
+        # 3rd step - topology recognition
+        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, True)
+
+        # 4th step - postprocessing
         graphml_format(vertices_list, save_path)
         graph6_format(vertices_list, save_path)
 
-        # display all windows until key is pressed
-        # cv.waitKey(0)
         print("0")
         return 0
     else:
