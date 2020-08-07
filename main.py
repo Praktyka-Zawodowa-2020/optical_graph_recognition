@@ -1,15 +1,12 @@
-import os
-import sys
 import cv2 as cv
 from argsparser import parser, parse_argument
 from preprocessing import preprocess
 from segmentation import segment
 from topology_recognition import recognize_topology
-from postprocesing import graph6_format, graphml_format
-from shared import Mode
+from postprocesing import postprocess
 
 
-def main(args=None):
+def main():
     args = parser.parse_args()
     mode, file_path, save_path = parse_argument(args)
 
@@ -32,8 +29,7 @@ def main(args=None):
         vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
 
         # 4th step - postprocessing
-        graphml_format(vertices_list, save_path)
-        graph6_format(vertices_list, save_path)
+        postprocess(vertices_list, save_path)
 
         print("0")
         return 0

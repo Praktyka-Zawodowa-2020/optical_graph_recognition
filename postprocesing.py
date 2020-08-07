@@ -3,6 +3,17 @@ from typing import List
 from shared import Color
 
 
+def postprocess(vertices_list: List[Vertex], save_path: str):
+    """
+    Save graph in .graph6 abd .graphml formats
+
+    :param vertices_list: list of detected vertices and connections between them
+    :param save_path: path for saving resulted files
+    """
+    graphml_format(vertices_list, save_path)
+    graph6_format(vertices_list, save_path)
+
+
 def graph6_format(vertex: List[Vertex], save_path: str):
     """
     Saves the graph in .graph6 format
