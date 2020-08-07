@@ -12,7 +12,7 @@ Its operation has been divided into 4 phases:
 3. Topology recognition
 4. Postprocessing
 
-## Preprocesing
+### Preprocesing
 
 In this phase, the input image undergoes the process of binarization and character removal. 
 
@@ -31,19 +31,19 @@ In post-processing based on the vertex list, the recognized graph was saved to t
 ## Run from the command line
 
 To run a script from the command line, type:
-'<path_to_python>\python.exe <path_to main.py> [-p path_to_photo] [-b background]'
+`<path_to_python>\python.exe <path_to main.py> [-p path_to_photo] [-b background]`
 
 To see more information, please enter:
-'<path_to_python>\python.exe <path_to main.py> -h'
+`<path_to_python>\python.exe <path_to main.py> -h`
  
 Example when you are in the script folder:
-'<path_to_python>\python.exe main.py -p <path_fo_file> -b AUTO'
+`<path_to_python>\python.exe main.py -p <path_fo_file> -b AUTO`
 
 Background mode
-'GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.) 
+`GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.) 
 CLEAN_BG - Hand drawn on empty uniform color background 
 PRINTED - Printed (e.g. from paper, publication, book...)
-AUTO - Mode is chosen automatically'
+AUTO - Mode is chosen automatically`
 
 
 ### For programmers and project developers
