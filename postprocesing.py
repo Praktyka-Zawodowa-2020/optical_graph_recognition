@@ -118,7 +118,7 @@ def graphml_format(vertex: List[Vertex], save_path: str):
         else:
             node = node + '<y:Fill color="#000000" transparent="true"/>\n'  # unfilled vertices
         node = node + '<y:BorderStyle color="#000000" type="line" width="4.0"/>\n'
-        node = node + '<y:Shape type="circle"/>\n'
+        node = node + '<y:Shape type="ellipse"/>\n'
         node = node + '</y:ShapeNode>\n'
         node = node + '</data>\n'
         node = node + '</node>\n'
