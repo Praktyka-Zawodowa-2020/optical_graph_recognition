@@ -6,7 +6,9 @@ This algorithm was created as part of the professional practice 2020 at the Gda≈
 ## About
 
 Written in python 3.7, it uses [OpenCV](https://docs.opencv.org/master/)
+
 This algorithm works with the server whose repository you can see [here](https://github.com/Praktyka-Zawodowa-2020/optical_graph_recognition_server).
+
 It can also be run from the command line.
 
 
@@ -76,6 +78,7 @@ The problems that the developers of this software will face are:
 ## References
 
 When creating the project, the authors were inspired by this [work](https://link.springer.com/content/pdf/10.1007%2F978-3-642-36763-2_47.pdf).
-Some solutions have been taken and adapted from [yWorks](https://www.yworks.com/blog/projects-optical-graph-recognition)
+
+Some solutions have been taken and adapted from [yWorks](https://www.yworks.com/blog/projects-optical-graph-recognition).
 
 #### Filip Chodziutko, Kacper Nowakowski 2020
