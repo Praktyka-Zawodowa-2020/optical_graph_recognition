@@ -11,17 +11,22 @@ class Mode:
     AUTO = 4        # Automatically chosen mode based on average background distance to objects
 
     @staticmethod
-    def get_mode(string):
-        if string == "GRID_BG":
+    def get_mode(cli_arg: str):
+        """
+        Resolves Mode code from command line input string
+        :param cli_arg: command line argument indicating Mode for processing
+        :return: Mode for processing
+        """
+        if cli_arg == "GRID_BG":
             return Mode.GRID_BG
-        elif string == "CLEAN_BG":
+        elif cli_arg == "CLEAN_BG":
             return Mode.CLEAN_BG
-        elif string == "PRINTED":
+        elif cli_arg == "PRINTED":
             return Mode.PRINTED
-        elif string == "AUTO":
+        elif cli_arg == "AUTO":
             return Mode.AUTO
         else:
-            print("1: Mode \""+string+"\" is not a viable mode.")
+            print("1: Mode \""+cli_arg+"\" is not a viable mode.")
             return -1
 
 
