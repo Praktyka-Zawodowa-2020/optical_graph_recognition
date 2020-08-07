@@ -31,6 +31,8 @@ In post-processing based on the vertex list, the recognized graph was saved to t
 
 ## Run from the command line
 
+`ATTENTION!!! Recognition of the file format is implemented on the server, so check carefully whether the path to the file indicates a photo in the * JPG * or * PNG * format`
+
 To run a script from the command line, type:
 
 `<path_to_python>\python.exe <path_to main.py> [-p path_to_photo] [-b background]`
@@ -44,10 +46,12 @@ Example when you are in the script folder:
 `<path_to_python>\python.exe main.py -p <path_fo_file> -b AUTO`
 
 Background mode
-`GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.) 
-CLEAN_BG - Hand drawn on empty uniform color background 
-PRINTED - Printed (e.g. from paper, publication, book...)
-AUTO - Mode is chosen automatically`
+```
+GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.) \n
+CLEAN_BG - Hand drawn on empty uniform color background \n
+PRINTED - Printed (e.g. from paper, publication, book...)\n
+AUTO - Mode is chosen automatically
+```
 
 
 ### For programmers and project developers
