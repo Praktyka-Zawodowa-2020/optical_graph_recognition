@@ -5,7 +5,8 @@
 This algorithm works with the server whose repository you can see [here](https://github.com/Praktyka-Zawodowa-2020/optical_graph_recognition_server).
 It can also be run from the command line.
 
-This algorithm was created as part of the professional practice 2020 at the Gdańsk University of Technology
+This algorithm was created as part of the professional practice 2020 at the Gdańsk University of Technology.
+
 Its operation has been divided into 4 phases:
 1. Preprocessing
 2. Segmentation
@@ -31,12 +32,15 @@ In post-processing based on the vertex list, the recognized graph was saved to t
 ## Run from the command line
 
 To run a script from the command line, type:
+
 `<path_to_python>\python.exe <path_to main.py> [-p path_to_photo] [-b background]`
 
 To see more information, please enter:
+
 `<path_to_python>\python.exe <path_to main.py> -h`
  
 Example when you are in the script folder:
+
 `<path_to_python>\python.exe main.py -p <path_fo_file> -b AUTO`
 
 Background mode
