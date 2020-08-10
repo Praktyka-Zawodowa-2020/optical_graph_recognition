@@ -59,9 +59,9 @@ Example when you are in the script folder:
 
 Background mode
 ```
-GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.) \n
-CLEAN_BG - Hand drawn on empty uniform color background \n
-PRINTED - Printed (e.g. from paper, publication, book...)\n
+GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.)
+CLEAN_BG - Hand drawn on empty uniform color background 
+PRINTED - Printed (e.g. from paper, publication, book...)
 AUTO - Mode is chosen automatically
 ```
 
