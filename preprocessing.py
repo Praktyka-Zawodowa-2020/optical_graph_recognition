@@ -1,7 +1,7 @@
 """Module with operations that are used to preprocess a graph picture"""
 import cv2 as cv
 import numpy as np
-import math
+from math import sqrt
 from shared import Kernel, Color, Mode
 
 MAX_R_FACTOR: float = 0.035
@@ -164,6 +164,7 @@ def transform(binary_image: np.ndarray, thresh_val: int, mode: int) -> np.ndarra
             transformed = filter_grid(binary_image, 40, 3, NOISE_FACTOR)
         else:
             transformed = filter_grid(binary_image, 30, 3, NOISE_FACTOR)
+        transformed = remove_margins(transformed)
     elif mode == Mode.CLEAN_BG:  # medium size noise is filtered
         transformed = cv.medianBlur(binary_image, 3)
 
@@ -188,10 +189,9 @@ def remove_contour_noise(image: np.ndarray, max_noise_factor: float) -> np.ndarr
     :param max_noise_factor: tiny factor to take part of image area as upper limit for noise area
     :return: Image with noise filtered out
     """
-    contours, _ = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv.findContours(image, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
 
     for i in range(0, len(contours)):
-
         if cv.contourArea(contours[i]) <= image.shape[0] * image.shape[1] * max_noise_factor:
             # fill contour area with background color
             cv.drawContours(image, contours, contourIdx=i, color=0, thickness=cv.FILLED)
@@ -227,13 +227,6 @@ def filter_grid(binary_image: np.ndarray, min_distance: int, start_kernel: int, 
     else:  # for very clear images only contour filtering is applied
         image = remove_contour_noise(binary, max_noise_factor)
 
-    # remove remaining straight (vertical and horizontal) lines
-    # usually the remaining lines are margins which are thicker than the rest of the grid an therefor are not filtered
-    horizontal = remove_horizontal_grid(image)
-    vertical = remove_vertical_grid(image)
-    # include removed pixels from both images
-    image = cv.bitwise_and(horizontal, vertical)
-
     return image
 
 
@@ -260,93 +253,42 @@ def avg_bg_distance(binary_image: np.ndarray) -> float:
     return np.min(averages)
 
 
-# TODO - change grid function with HoughLines to only remove margins
-def remove_horizontal_grid(binary_image: np.ndarray) -> np.ndarray:
+def remove_margins(binary_image: np.ndarray) -> np.ndarray:
     """
-    Remove horizontal grid lines (long lines that go across image y axis)
+    Remove vertical and horizontal margins (lines that go the whole way through a binary image).
 
-    :param binary_image: input image
-    :return: image without horizontal grid
+    :param binary_image: input transformed image with notebook margins remaining
+    :return: image with margins removed
     """
-    # 1st step - extract horizontally aligned pixels from image using structuring element
+    margin_lines = []
+    # detect horizontal margin lines
     width = binary_image.shape[1]
     structure = cv.getStructuringElement(cv.MORPH_RECT, (width // 50, 1))
-    horizontal = cv.erode(binary_image, structure)
-    horizontal = cv.dilate(horizontal, structure)
+    horizontal = cv.morphologyEx(binary_image, cv.MORPH_OPEN, structure, iterations=1)
     horizontal = cv.dilate(horizontal, Kernel.k3, iterations=1)
+    margin_lines.append(cv.HoughLines(horizontal, 1, np.pi / 180, 500))
 
-    # 2nd step - fit straight lines across whole image to create a mask
-    lines = cv.HoughLines(horizontal, 1, np.pi / 180, 500)
-    horizontal_mask = np.zeros((horizontal.shape[0], horizontal.shape[1]), np.uint8)
-    if lines is not None:
-        for line in lines:
-            rho, theta = line[0]
-            a = np.cos(theta)
-            b = np.sin(theta)
-            x0 = a * rho
-            y0 = b * rho
-            x1 = int(x0 + 1500 * (-b))
-            y1 = int(y0 + 1500 * a)
-            x2 = int(x0 - 1500 * (-b))
-            y2 = int(y0 - 1500 * a)
-            cv.line(horizontal_mask, (x1, y1), (x2, y2), 255, 7)
-    # 3rd step - apply mask to image so that only lines that go across all pictures width remain
-    masked = cv.bitwise_and(horizontal, horizontal_mask)
-    masked = cv.erode(masked, Kernel.k3, iterations=1)
-    # 4th step - find reasonably long lines on masked image and remove them from original image
-    lines = cv.HoughLinesP(masked, 1, np.pi / 180, threshold=20, minLineLength=width // 25, maxLineGap=10)
-    image = np.copy(binary_image)
-    if lines is not None:
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            cv.line(image, (x1, y1), (x2, y2), 0, 2)
-
-    return image
-
-
-def remove_vertical_grid(binary_image: np.ndarray) -> np.ndarray:
-    """
-    Remove vertical grid lines (long lines that go across image x axis)
-
-    :param binary_image: input image
-    :return: image without vertical grid
-    """
-    # 1st step - extract vertically aligned pixels from image using structuring element
-
+    # detect vertical margin lines
     height = binary_image.shape[0]
     structure = cv.getStructuringElement(cv.MORPH_RECT, (1, height // 50))
-    vertical = cv.erode(binary_image, structure)
-    vertical = cv.dilate(vertical, structure)
+    vertical = cv.morphologyEx(binary_image, cv.MORPH_OPEN, structure, iterations=1)
     vertical = cv.dilate(vertical, Kernel.k3, iterations=1)
+    margin_lines.append(cv.HoughLines(vertical, 1, np.pi / 180, 400))
 
-    # 2nd step - fit straight lines across whole image to create a mask
-    lines = cv.HoughLines(vertical, 1, np.pi / 180, 400)
+    # remove detected margins
+    processed = binary_image.copy()
+    diagonal_len = sqrt(processed.shape[1] ** 2 + processed.shape[0] ** 2)
+    for lines in margin_lines:
+        if lines is not None:
+            for line in lines:  # convert each line from Polar to Cartesian coordinate system
+                rho, theta = line[0]
+                a, b = (np.cos(theta), np.sin(theta))
+                x0, y0 = (a * rho, b * rho)
+                pt1 = (int(x0 + diagonal_len * (-b)), int(y0 + diagonal_len * a))
+                pt2 = (int(x0 - diagonal_len * (-b)), int(y0 - diagonal_len * a))
+                cv.line(processed, pt1, pt2, Color.BG, 6)  # mask margin line in the image
 
-    vertical_mask = np.zeros((vertical.shape[0], vertical.shape[1]), np.uint8)
-    if lines is not None:
-        for line in lines:
-            rho, theta = line[0]
-            a = np.cos(theta)
-            b = np.sin(theta)
-            x0 = a * rho
-            y0 = b * rho
-            x1 = int(x0 + 1500 * (-b))
-            y1 = int(y0 + 1500 * (a))
-            x2 = int(x0 - 1500 * (-b))
-            y2 = int(y0 - 1500 * (a))
-            cv.line(vertical_mask, (x1, y1), (x2, y2), 255, 7)
-    # 3rd step - apply mask to image so that only lines that go across all pictures height remain
-    masked = cv.bitwise_and(vertical, vertical_mask)
-    masked = cv.erode(masked, Kernel.k3, iterations=1)
-    # 4th step - find reasonably long lines on masked image and remove them from original image
-    lines = cv.HoughLinesP(masked, 1, np.pi / 180, threshold=30, minLineLength=height // 25, maxLineGap=10)
-    image = np.copy(binary_image)
-    if lines is not None:
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            cv.line(image, (x1, y1), (x2, y2), 0, 2)
-
-    return image
+    return processed
 
 
 def crop_bg_padding(binary_transformed: np.ndarray, images: list, padding: int = 15) -> (np.ndarray, list):
