@@ -1,4 +1,7 @@
+"""Main module containing script entry - main function"""
 import cv2 as cv
+
+from shared import Debug
 from argsparser import parser, parse_argument
 from preprocessing import preprocess
 from segmentation import segment
@@ -8,28 +11,33 @@ from postprocesing import postprocess
 
 def main():
     args = parser.parse_args()
-    mode, file_path, save_path = parse_argument(args)
+    mode, debug, file_path, save_path = parse_argument(args)
 
-    if mode == -1 or len(save_path) == 0:
+    if mode == -1 or debug == -1 or len(save_path) == 0:
+        print("1: Error reading input arguments!")
         return -1
 
     source = cv.imread(file_path)
     if source is not None:  # read successful, process image
 
         # 1st step - preprocessing
-        source, preprocessed, mode = preprocess(source, False, mode)
+        source, preprocessed, mode = preprocess(source, debug, mode)
 
         # 2nd step - segmentation
-        vertices_list, visualised, preprocessed = segment(source, preprocessed, False, mode)
+        vertices_list, visualised, preprocessed = segment(source, preprocessed, debug, mode)
         if len(vertices_list) == 0:
             print("1: No vertices found")
             return -1
 
         # 3rd step - topology recognition
-        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, False)
+        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, debug)
 
         # 4th step - postprocessing
         postprocess(vertices_list, save_path)
+
+        # if displaying debug info has been enabled keep displayed windows open until key is pressed
+        if debug != Debug.NO:
+            cv.waitKey(0)
 
         print("0")
         return 0

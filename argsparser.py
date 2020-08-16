@@ -1,19 +1,13 @@
 import os
-from shared import Mode
 import argparse
 
+from shared import Mode, Debug
+
+# instance of parser for reading cli arguments
 parser = argparse.ArgumentParser("Optical graph recognition")
 parser.add_argument("-p", "--path", help="Path to file")
-parser.add_argument("-b", "--background",
-                    help='''
-                            GRID_BG - Hand drawn on grid/lined piece of paper (grid/lined notebook etc.) 
-                            CLEAN_BG - Hand drawn on empty uniform color background 
-                            PRINTED - Printed (e.g. from paper, publication, book...)
-                            AUTO - Mode is chosen automatically
-                        ''',
-                    default='CLEAN_BG',
-                    choices=['CLEAN_BG', 'GRID_BG', 'PRINTED', 'AUTO']
-                    )
+parser.add_argument("-m", "--mode", help=Mode.HELP, choices=Mode.CHOICES, default=Mode.DEFAULT, type=str.lower)
+parser.add_argument("-d", "--debug", help=Debug.HELP, choices=Debug.CHOICES, default=Debug.DEFAULT, type=str.lower)
 
 
 def parse_argument(args) -> (int, str, str):
@@ -24,9 +18,10 @@ def parse_argument(args) -> (int, str, str):
     :return: mode, path to photo, path to save the result
     """
     save_path = parse_path(args.path)
-    mode = Mode.get_mode(args.background)
+    mode = Mode.get_mode(args.mode)
+    debug = Debug.get_debug(args.debug)
 
-    return mode, args.path, save_path
+    return mode, debug, args.path, save_path
 
 
 def parse_path(file_path: str) -> str:

@@ -4,7 +4,7 @@ import numpy as np
 
 from math import ceil, floor, sqrt
 from Vertex import Vertex
-from shared import Color, Kernel, Mode
+from shared import Color, Kernel, Mode, Debug
 
 # Constants for HoughCircles function
 MAX_R_FACTOR: float = 0.04
@@ -23,14 +23,17 @@ VERTEX_AREA_LOWER: float = 0.0003
 ROUND_RATIO: float = 3.0
 MIN_FILL: float = 0.5
 
+# debugging windows title prefix
+DBG_TITLE = "segmentation: "
 
-def segment(source: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool, mode: int) -> [list, np.ndarray]:
+
+def segment(source: np.ndarray, preprocessed: np.ndarray, debug: Debug, mode: int) -> [list, np.ndarray]:
     """
     Detect vertices in preprocessed image and return them in a list
 
     :param source: resized input image
     :param preprocessed: fully preprocessed image
-    :param imshow_enabled: flag determining to display (or not) segmentation steps
+    :param debug: indicates how much debugging windows will be displayed
     :param mode: input type, see shared.py for more detailed description
     :return vertices_list: list of detected Vertices (objects of Vertex class), visualised results of detection
         and modified preprocessed image for topology recognition
@@ -49,11 +52,11 @@ def segment(source: np.ndarray, preprocessed: np.ndarray, imshow_enabled: bool, 
     elif mode == Mode.GRID_BG:
         vertices_list, visualised, preprocessed = find_vertices(source, preprocessed, edgeless, 1.75, 0.35)
 
-    # display results of certain steps
-    if imshow_enabled:
-        cv.imshow("filled", filled)
-        cv.imshow("edgeless", edgeless)
-        cv.imshow(str(len(vertices_list)) + " detected vertices", visualised)
+    # Display intermediate and final results of segmentation
+    if debug == Debug.FULL:
+        cv.imshow(DBG_TITLE+"empty vertices filled", filled)
+        cv.imshow(DBG_TITLE+"edges removed", edgeless)
+        cv.imshow(DBG_TITLE+str(len(vertices_list)) + " detected vertices", visualised)
 
     return vertices_list, visualised, preprocessed
 

@@ -1,14 +1,10 @@
 """Module with operations that are used to preprocess a graph picture"""
 import cv2 as cv
 import numpy as np
-from math import sqrt
-from shared import Kernel, Color, Mode
 
-MAX_R_FACTOR: float = 0.035
-MIN_R_FACTOR: float = 0.005
-DIST_FACTOR: float = 0.06
-INNER_CANNY: int = 200
-CIRCLE_THRESHOLD: int = 13
+from math import sqrt
+from shared import Kernel, Color, Mode, Debug
+
 # constants:
 # for threshold function
 GLOBAL_THRESH_FAILED = -1
@@ -24,15 +20,18 @@ MAX_FILL_RATIO: float = 0.14  # ratio of object pixels to all pixels
 NOISE_FACTOR: float = 0.0001  # px^2
 # for automatic mode choice
 MODE_THRESHOLD: float = 10  # min average distance of bg pixels to object pixels to consider image background clean
+# debugging windows title prefix
+DBG_TITLE = "preprocessing: "
 
 
-def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarray, np.ndarray, Mode):
+def preprocess(source: np.ndarray, debug: Debug, mode: int) -> (np.ndarray, np.ndarray, Mode):
+
     """
     Processes source image by reshaping, thresholding, transforming and cropping.
     If auto mode has been selected, choose mode automatically
 
     :param source: input image
-    :param imshow_enabled: flag determining to display (or not) preprocessing steps
+    :param debug: indicates how much debugging windows will be displayed
     :param mode: GRID_BG, CLEAN_BG, PRINTED
     :return: reshaped and fully preprocessed images, changed (if mode is AUTO) or unchanged mode
     """
@@ -57,14 +56,15 @@ def preprocess(source: np.ndarray, imshow_enabled: bool, mode: int) -> (np.ndarr
     transformed, [reshaped, binary] = crop_bg_padding(transformed, [reshaped, binary])
 
     # Remove characters
-    # without_chars = delete_characters(transformed)  # TODO - mode from command line
+    # without_chars = delete_characters(transformed)  # TODO - improve - apply OCR
 
-    # Display results of preprocessing steps
-    if imshow_enabled:
-        cv.imshow("reshaped source " + str(reshaped.shape[1]) + "x" + str(reshaped.shape[0]), reshaped)
-        cv.imshow("binary, th=" + str(threshold_value), binary)
-        cv.imshow("transformed", transformed)
-        # cv.imshow("Chars deleted", without_chars)
+    # display debug info
+    if debug == Debug.GENERAL or debug == Debug.FULL:
+        cv.imshow(DBG_TITLE + "reshaped source image" + str(reshaped.shape[1]) + "x" + str(reshaped.shape[0]),
+                  reshaped)
+        if debug == Debug.FULL:
+            cv.imshow(DBG_TITLE + "binarized image, treshold=" + str(threshold_value), binary)
+        cv.imshow(DBG_TITLE + "final result", transformed)
 
     return reshaped, transformed, mode
 

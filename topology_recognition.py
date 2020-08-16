@@ -1,19 +1,20 @@
 """Module with operations that are used to recognize topology of a graph"""
 import cv2 as cv
 import numpy as np
-import math
 
 from Vertex import Vertex
-from shared import Color
+from shared import Color, Debug
 
 # constants
 MIN_EDGE_LEN: int = 10  # px
 VERTEX_AREA_FACTOR: float = 1.6
 WITHIN_R_FACTOR: float = 3.4
 
+# debugging windows title prefix
+DBG_TITLE = "topology recognition: "
 
-def recognize_topology(vertices_list: list, preprocessed: np.ndarray, visualised: np.ndarray, imshow_enabled: bool) \
-        -> list:
+
+def recognize_topology(vertices_list: list, preprocessed: np.ndarray, visualised: np.ndarray, debug: Debug) -> list:
     """
     Remove vertices from image, and based on remaining contours detect edges that connect those vertices.
     Result of detection is a list of vertices with connection (neighbour) list for each vertex.
@@ -21,16 +22,20 @@ def recognize_topology(vertices_list: list, preprocessed: np.ndarray, visualised
     :param vertices_list: list of detected vertices in segmentation phase
     :param preprocessed: image after preprocessing phase
     :param visualised: copy of source image with vertices drawn
-    :param imshow_enabled: flag determining to display (or not) topology recognition steps
+    :param debug: indicates how much debugging windows will be displayed
     :return: list where each vertex has list of connected vertices (its neighbours)
     """
     preprocessed, topology_backend = remove_vertices(vertices_list, preprocessed, visualised)
 
     vertices_list, topology_backend, visualised = find_edges(vertices_list, preprocessed, topology_backend, visualised)
-    if imshow_enabled:
-        cv.imshow("removed vertices", preprocessed)
-        cv.imshow("topology backend: search areas and approx. edges", topology_backend)
-        cv.imshow("visualised", visualised)
+
+    # Display intermediate results of topology recognition
+    if debug == Debug.FULL:
+        cv.imshow(DBG_TITLE+"removed vertices", preprocessed)
+        cv.imshow(DBG_TITLE+"\"backend\" - search areas and approximated edges", topology_backend)
+    # Display final results of topology recognition
+    if debug == Debug.GENERAL or debug == Debug.FULL:
+        cv.imshow(DBG_TITLE+"final results", visualised)
 
     return vertices_list
 
