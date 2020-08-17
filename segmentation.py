@@ -285,8 +285,7 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
 
 
 def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.ndarray,
-                  round_ratio: float = ROUND_RATIO, min_fill: float = 0.5) \
-        -> (list, np.ndarray, np.ndarray):
+                  round_ratio: float = ROUND_RATIO, min_fill: float = 0.5) -> (list, np.ndarray, np.ndarray):
     """
     Finds vertices based on detected contours in the edgeless image. Return list of those vertices.
     For topology recognition purposes Delete shapes from preprocessed image, that are not round enough
@@ -317,12 +316,12 @@ def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.nda
                 if fill_ratio >= min_fill \
                         and cv.contourArea(cnt) <= edgeless.shape[0] * edgeless.shape[1] * VERTEX_AREA_UPPER:
                     # determining vertex color
-                    color = vertex_binary_color(cv.medianBlur(preprocessed, 5), x, y, r, COLOR_R_FACTOR,
-                                                COLOR_THRESHOLD)
-
-                    vertices_list.append(Vertex(x, y, r, color))  # creating Vertex from calculated data
+                    is_filled, color = vertex_color_fill(cv.medianBlur(preprocessed, 5), source, x, y, r, COLOR_R_FACTOR, COLOR_THRESHOLD)
+                    vertices_list.append(Vertex(x, y, r, is_filled, color))  # creating Vertex from data
                     # creating visual representation of detected vertices
-                    thickness = 8 if color == Color.OBJECT else 2
+                    if is_filled:
+                        cv.circle(visualized, (x, y), r, color, cv.FILLED, 8, 0)
+                    thickness = 1 if is_filled else 2
                     cv.circle(visualized, (x, y), r, Color.GREEN, thickness, 8, 0)
                     # cv.putText(visualized, "F", (abs(x-10), abs(y+10)), cv.QT_FONT_NORMAL, 1.0, Color.GREEN)
                 elif fill_ratio < min_fill:  # remove unused contour
@@ -343,44 +342,67 @@ def circle_fill_ratio(binary: np.ndarray, x: int, y: int, r: int) -> float:
     :return:
     """
     fill_ratio = 0
-    if x >= 0 and y >= 0:
-        # calculate square area boundaries that contains circle area
-        top = y - r if ((y - r) >= 0) else 0
-        bottom = y + r if ((y + r) <= binary.shape[0]) else binary.shape[0]
-        left = x - r if ((x - r) >= 0) else 0
-        right = x + r if ((x + r) <= binary.shape[1]) else binary.shape[1]
-
-        # in inner circle area count black and white pixels to find dominant color
-        pixel_count = 0
-        object_count = 0
-        for y_iter in range(top, bottom):
-            for x_iter in range(left, right):
-                distance = round(sqrt((x - x_iter) ** 2 + (y - y_iter) ** 2))
-                if distance <= r:
-                    pixel_count += 1
-                    if binary[y_iter, x_iter] == Color.OBJECT:
-                        object_count += 1
-        if pixel_count > 0:
-            fill_ratio = object_count / float(pixel_count)
+    pixel_array = extract_circle_area(binary, x, y, r)
+    if pixel_array is not None:
+        pixel_array = pixel_array / Color.OBJECT  # normalize - filled pixels have value 1 and unfilled 0
+        fill_ratio = np.average(pixel_array)
 
     return fill_ratio
 
 
-def vertex_binary_color(binary: np.ndarray, x: int, y: int, r: float, r_factor: float, threshold: float) -> int:
+def extract_circle_area(image: np.ndarray, x: int, y: int, r: int) -> np.ndarray:
     """
-    Determine vertex color based on fill ratio inside vertex area
+    Extract circular area from image into numpy array of pixels
+
+    :param image: input image
+    :param x: x coordinate of circle center
+    :param y: y coordinate of circle center
+    :param r: circle radius
+    :return:
+    """
+    pixel_list = []
+    if x >= 0 and y >= 0:
+        # calculate square area boundaries that contains circle area
+        top = y - r if ((y - r) >= 0) else 0
+        bottom = y + r if ((y + r) <= image.shape[0]) else image.shape[0]
+        left = x - r if ((x - r) >= 0) else 0
+        right = x + r if ((x + r) <= image.shape[1]) else image.shape[1]
+
+        # in inner circle area count black and white pixels to find dominant color
+        for y_iter in range(top, bottom):
+            for x_iter in range(left, right):
+                distance = round(sqrt((x - x_iter) ** 2 + (y - y_iter) ** 2))
+                if distance <= r:
+                    pixel_list.append(image[y_iter][x_iter])
+    return np.array(pixel_list) if len(pixel_list) > 0 else None
+
+
+def vertex_color_fill(binary: np.ndarray, source: np.ndarray, x: int, y: int, r: float, r_factor: float,
+                      threshold: float) -> (int, bool):
+    """
+    Determine vertex color based on average color
+    Check if vertex is filled in binary image
     Inner vertex area is created by multiplying radius by radius factor to exclude vertex border pixels
     :param binary: binary input image
+    :param source: source input image
     :param x: coordinate of vertex center
     :param y: coordinate of vertex center
     :param r: vertex radius
-    :param r_factor: factor used to reduce original radius to exclude borders of unfilled vertex.
-        should be <= 0
+    :param r_factor: factor used to reduce original radius to exclude borders of unfilled vertex. should be <= 0
     :param threshold: lower limit for fill ratio to consider vertex filled
-    :return: Dominant color in vertex area
+    :return: flag indicating if vertex is filled and approximated bgr color inside vertex
     """
+    # check on binary image if vertex is filled
     fill_ratio = circle_fill_ratio(binary, x, y, int(r * r_factor))
-    if fill_ratio >= threshold:
-        return 255
-    else:
-        return 0
+    is_filled = True if fill_ratio >= threshold else False
+
+    # calculate vertex color
+    pixel_arr = extract_circle_area(source, x, y, int(r * r_factor))
+    b = np.average(pixel_arr[:, 0])
+    g = np.average(pixel_arr[:, 1])
+    r = np.average(pixel_arr[:, 2])
+
+    return is_filled, (int(b), int(g), int(r))
+
+
+
