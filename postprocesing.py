@@ -1,6 +1,5 @@
 from Vertex import Vertex
 from typing import List
-from shared import Color
 
 
 def postprocess(vertices_list: List[Vertex], save_path: str):
@@ -113,10 +112,7 @@ def graphml_format(vertex: List[Vertex], save_path: str):
         node = node + '<data key="d0">\n'
         node = node + '<y:ShapeNode>\n'
         node = node + '<y:Geometry height="30.0" width="30.0" x="' + str(V.x) + '" y="' + str(V.y) + '"/>\n'  # localization and size
-        if V.color == Color.OBJECT:
-            node = node + '<y:Fill color="#000000" transparent="false"/>\n'  # filled vertices
-        else:
-            node = node + '<y:Fill color="#000000" transparent="true"/>\n'  # unfilled vertices
+        node = node + '<y:Fill color="#'+color_string(V.color)+'" transparent="'+('false' if V.is_filled else 'true') + '"/>\n'
         node = node + '<y:BorderStyle color="#000000" type="line" width="4.0"/>\n'
         node = node + '<y:Shape type="ellipse"/>\n'
         node = node + '</y:ShapeNode>\n'
@@ -146,3 +142,18 @@ def graphml_format(vertex: List[Vertex], save_path: str):
     f.write("</graphml>\n")
     f.close()
 
+
+def color_string(color: (int, int, int)):
+    """
+    Converts BGR integer values into concatenated string of hex values
+
+    :param color: input 3 channels of BGR color
+    :return: RGB string of hex values
+    """
+    hex_string = ""
+    for i in range(2, -1, -1):  # reposition channels form BGR to RGB
+        if color[i] < 16:
+            hex_string += "0"  # add leading zero for one digit hex values
+        hex_string += hex(color[i])[2:]  # remove '0x' prefix and concatenate
+
+    return hex_string
