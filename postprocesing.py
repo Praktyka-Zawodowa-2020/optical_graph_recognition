@@ -2,14 +2,15 @@ from Vertex import Vertex
 from typing import List
 
 
-def postprocess(vertices_list: List[Vertex], save_path: str):
+def postprocess(vertices_list: List[Vertex], save_path: str, is_rotated: bool):
     """
     Save graph in .graph6 abd .graphml formats
 
     :param vertices_list: list of detected vertices and connections between them
     :param save_path: path for saving resulted files
+    :param is_rotated: flag indicating if graph has been rotated in preprocessing, if True rotation must be undone
     """
-    graphml_format(vertices_list, save_path)
+    graphml_format(vertices_list, save_path, is_rotated)
     graph6_format(vertices_list, save_path)
 
 
@@ -66,12 +67,13 @@ def graph6_format(vertex: List[Vertex], save_path: str):
     f.close()
 
 
-def graphml_format(vertex: List[Vertex], save_path: str):
+def graphml_format(vertex: List[Vertex], save_path: str, is_rotated: bool):
     """
     Saves the graph in .grapml format
 
     :param save_path: Folder path with the file name. No extension
     :param vertex: Lists of vertex
+    :param is_rotated: flag indicating if graph has been rotated in preprocessing, if True rotation must be undone
     :return:
 
     Args:
@@ -111,7 +113,8 @@ def graphml_format(vertex: List[Vertex], save_path: str):
         node = '<node id="n' + str(V.id) + '">\n'
         node = node + '<data key="d0">\n'
         node = node + '<y:ShapeNode>\n'
-        node = node + '<y:Geometry height="30.0" width="30.0" x="' + str(V.x) + '" y="' + str(V.y) + '"/>\n'  # localization and size
+        vx, vy = (V.x, V.y) if not is_rotated else (V.y, -V.x)  # if rotation took place remove rotation
+        node = node + '<y:Geometry height="30.0" width="30.0" x="' + str(vx) + '" y="' + str(vy) + '"/>\n'
         node = node + '<y:Fill color="#'+color_string(V.color)+'" transparent="'+('false' if V.is_filled else 'true') + '"/>\n'
         node = node + '<y:BorderStyle color="#000000" type="line" width="4.0"/>\n'
         node = node + '<y:Shape type="ellipse"/>\n'

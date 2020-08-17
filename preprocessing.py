@@ -33,10 +33,10 @@ def preprocess(source: np.ndarray, debug: Debug, mode: int) -> (np.ndarray, np.n
     :param source: input image
     :param debug: indicates how much debugging windows will be displayed
     :param mode: GRID_BG, CLEAN_BG, PRINTED
-    :return: reshaped and fully preprocessed images, changed (if mode is AUTO) or unchanged mode
+    :return: reshaped and fully preprocessed images, changed (if mode is AUTO) or unchanged mode, rotation flag
     """
     # Reshape image to standard resolution
-    reshaped = reshape(source, WIDTH_LIM, HEIGHT_LIM)
+    reshaped, is_rotated = reshape(source, WIDTH_LIM, HEIGHT_LIM)
     # cv.imwrite("./tests/" + str(i) + "bsource.jpg", reshaped)
 
     # Convert image to gray scale
@@ -66,7 +66,7 @@ def preprocess(source: np.ndarray, debug: Debug, mode: int) -> (np.ndarray, np.n
             cv.imshow(DBG_TITLE + "binarized image, treshold=" + str(threshold_value), binary)
         cv.imshow(DBG_TITLE + "final result", transformed)
 
-    return reshaped, transformed, mode
+    return reshaped, transformed, mode, is_rotated
 
 
 def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
@@ -78,11 +78,13 @@ def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
     :param image: input image
     :param width_lim: limit for width
     :param height_lim: limit for height
-    :return: reshaped (scaled and rotated if needed) image
+    :return: reshaped (scaled and rotated if needed) image and flag indicating if graph has been rotated
     """
     img_width = image.shape[1]
     img_height = image.shape[0]
+    is_rotated = False
     if img_height > img_width:  # If image is oriented horizontally - rotate to orient vertically
+        is_rotated = True
         image = cv.rotate(image, cv.ROTATE_90_CLOCKWISE)
         # image size changed after rotation, we only need new width
         img_width = image.shape[1]
@@ -95,7 +97,7 @@ def reshape(image: np.ndarray, width_lim: int = 1280, height_lim: int = 800):
         height_factor = height_lim / img_height
         image = cv.resize(image, (0, 0), fx=height_factor, fy=height_factor)
 
-    return image
+    return image, is_rotated
 
 
 def threshold(gray_image: np.ndarray, min_bright_value: int = 128, max_fill_ratio: float = 0.14):

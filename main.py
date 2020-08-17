@@ -21,7 +21,7 @@ def main():
     if source is not None:  # read successful, process image
 
         # 1st step - preprocessing
-        source, preprocessed, mode = preprocess(source, debug, mode)
+        source, preprocessed, mode, is_rotated = preprocess(source, debug, mode)
 
         # 2nd step - segmentation
         vertices_list, visualised, preprocessed = segment(source, preprocessed, debug, mode)
@@ -33,7 +33,7 @@ def main():
         vertices_list = recognize_topology(vertices_list, preprocessed, visualised, debug)
 
         # 4th step - postprocessing
-        postprocess(vertices_list, save_path)
+        postprocess(vertices_list, save_path, is_rotated)
 
         # if displaying debug info has been enabled keep displayed windows open until key is pressed
         if debug != Debug.NO:
