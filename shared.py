@@ -78,6 +78,9 @@ class Color:
     WHITE = (255, 255, 255)
     YELLOW = (0, 255, 255)
     ORANGE = (0, 140, 255)
+    PURPLE = (127, 0, 127)
+    PINK = (255, 0, 255)
+    CYAN = (255, 255, 0)
 
 
 class Kernel:

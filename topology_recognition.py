@@ -1,152 +1,293 @@
 """Module with operations that are used to recognize topology of a graph"""
 import cv2 as cv
 import numpy as np
+import math
 
 from Vertex import Vertex
-from shared import Color, Debug
+from shared import Color, Debug, Kernel, Mode
 
 # constants
 MIN_EDGE_LEN: int = 10  # px
-VERTEX_AREA_FACTOR: float = 1.6
-WITHIN_R_FACTOR: float = 3.4
+VERTEX_AREA_FACTOR: float = 1.3
 
 # debugging windows title prefix
 DBG_TITLE = "topology recognition: "
 
 
-def recognize_topology(vertices_list: list, preprocessed: np.ndarray, visualised: np.ndarray, debug: Debug) -> list:
+def recognize_topology(vertices_list: list, preprocessed: np.ndarray, visualised: np.ndarray, edge_thickness: int,
+                       mode: Mode, debug: Debug) -> list:
     """
-    Remove vertices from image, and based on remaining contours detect edges that connect those vertices.
-    Result of detection is a list of vertices with connection (neighbour) list for each vertex.
+    Remove vertices from image and based on remaining contours detect edges that connect those vertices.
+    Result of detection is a list of vertices with adjacency (connections) list for each vertex.
 
     :param vertices_list: list of detected vertices in segmentation phase
     :param preprocessed: image after preprocessing phase
     :param visualised: copy of source image with vertices drawn
+    :param edge_thickness: value indicating how much erosion iterations has been performed in segmentation in order to
+        remove edges from binary image
+    :param mode: input type, see shared.py for more detailed description
     :param debug: indicates how much debugging windows will be displayed
-    :return: list where each vertex has list of connected vertices (its neighbours)
+    :return: list where each vertex has list of adjacent vertices (those that are connected)
     """
-    preprocessed, topology_backend = remove_vertices(vertices_list, preprocessed, visualised)
+    preprocessed = remove_vertices(vertices_list, preprocessed, VERTEX_AREA_FACTOR)
+    preprocessed = remove_lines_intersections(preprocessed, edge_thickness)
 
-    vertices_list, topology_backend, visualised = find_edges(vertices_list, preprocessed, topology_backend, visualised)
+    lines_list, backend = lines_from_contours(preprocessed, visualised.copy())
+
+    search_radius = int(np.average(np.array([v.r for v in vertices_list])))  # calculate optimal search area radius
+    if mode == Mode.PRINTED:
+        linked_lines, backend = link_nearby_endpoints(lines_list, backend, 1.5 * search_radius, 15)
+        vertices_list, backend, visualised = edges_from_lines(linked_lines, vertices_list, backend, visualised, 2.4)
+    else:
+        linked_lines, backend = link_nearby_endpoints(lines_list, backend, 1.5 * search_radius, 20)
+        vertices_list, backend, visualised = edges_from_lines(linked_lines, vertices_list, backend, visualised, 3.1)
 
     # Display intermediate results of topology recognition
     if debug == Debug.FULL:
-        cv.imshow(DBG_TITLE+"removed vertices", preprocessed)
-        cv.imshow(DBG_TITLE+"\"backend\" - search areas and approximated edges", topology_backend)
+        cv.imshow(DBG_TITLE+"removed vertices and lines intersections", preprocessed)
+        cv.imshow(DBG_TITLE+"\"backend\" - colors description in topology.py", backend)
+        # backend colors description: yellow - lines contours, cyan - lines segments endpoints,
+        # orange - approximated edges, purple - vertex search area for edges endpoints
     # Display final results of topology recognition
     if debug == Debug.GENERAL or debug == Debug.FULL:
-        cv.imshow(DBG_TITLE+"final results", visualised)
+        cv.imshow(DBG_TITLE+"final results - green: vertices, red: edges", visualised)
 
     return vertices_list
 
 
-def remove_vertices(vertices_list: list, preprocessed: np.ndarray, visualised: np.ndarray) -> (np.ndarray, np.ndarray):
+def remove_vertices(vertices_list: list, preprocessed: np.ndarray, vertex_area_factor: float) -> np.ndarray:
     """
-    # Remove vertices areas from binary preprocessed image by setting those areas as background
-    # Also mark areas for each vertex within which endpoints of edges will can be assigned to vertex
+    Remove vertices areas from binary preprocessed image by filling those areas with background color
 
     :param vertices_list: list of detected vertices in segmentation phase
     :param preprocessed: image after preprocessing phase
-    :param visualised: copy of source image with vertices drawn
-    :return: processed image without vertices and image with visualised vertices areas
+    :param vertex_area_factor: radius factor indicating how much area will be removed around vertices centers
+    :return: processed image without vertices
     """
-    within_areas = np.copy(visualised)
-    for vrtx in vertices_list:
+    for vertex in vertices_list:
         # remove vertices
-        cv.circle(
-            preprocessed, (vrtx.x, vrtx.y), round(vrtx.r * VERTEX_AREA_FACTOR),
-            color=Color.BG, thickness=cv.FILLED, lineType=8
-        )
-        # visualise "within area"
-        cv.circle(within_areas, (vrtx.x, vrtx.y), round(vrtx.r * WITHIN_R_FACTOR), Color.BLUE, thickness=cv.FILLED)
-    return preprocessed, within_areas
+        cv.circle(preprocessed, (vertex.x, vertex.y), round(vertex.r * vertex_area_factor), Color.BG, cv.FILLED)
+    return preprocessed
 
 
-def find_edges(vertices_list: list, preprocessed: np.ndarray, topology_backend: np.ndarray, visualised: np.ndarray)\
-        -> (list, np.ndarray, np.ndarray):
+def remove_lines_intersections(preprocessed: np.ndarray, edge_thickness: int) -> np.ndarray:
     """
-    Find vertices edges from contours.
+    Remove line intersections in binary image.
 
-    :param vertices_list: list of detected vertices in segmentation phase
-    :param preprocessed: image after preprocessing phase
-    :param topology_backend: source image with visualised vertices areas
-    :param visualised: copy of source image with vertices drawn
-    :return: list where each vertex has list of connected vertices (its neighbours),
-    image with visualised intermediate recognition steps and shapes, image with visualised final topology
+    :param preprocessed: preprocessed image with vertices removed
+    :param edge_thickness: value indicating how much erosion iterations has been performed in segmentation in order to
+        remove edges from binary image
+    :return: image with line intersections removed
     """
-    contours, _ = cv.findContours(preprocessed, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    cv.drawContours(topology_backend, contours, -1, Color.YELLOW, 1)
-    for cnt in contours:
-        pt1, pt2 = fit_line(cnt)
-        if np.linalg.norm(pt1 - pt2) > MIN_EDGE_LEN:    # considering lines that are long enough to be an edge
-            cv.line(
-                topology_backend, (round(pt1[0]), round(pt1[1])), (round(pt2[0]), round(pt2[1])),
-                Color.ORANGE, thickness=3
-            )
-            index1 = find_nearest_vertex(pt1, vertices_list)
-            vertex1 = vertices_list[index1]
-            index2 = find_nearest_vertex(pt2, vertices_list)
-            vertex2 = vertices_list[index2]
-            # check if:
-            # points are within vertex area,
-            # edge endpoints are assigned to different vertices,
-            # connection doesn't already exists
-            if point_within_radius(pt1, vertex1, WITHIN_R_FACTOR)\
-                    and point_within_radius(pt2, vertex2, WITHIN_R_FACTOR)\
-                    and index1 != index2\
-                    and index2 not in vertex1.neighbour_list and index1 not in vertex2.neighbour_list:
-                vertex1.neighbour_list.append(index2)
-                vertex2.neighbour_list.append(index1)
-                cv.line(visualised, (vertex1.x, vertex1.y), (vertex2.x, vertex2.y), Color.RED, thickness=2)
-                cv.circle(visualised, (vertex1.x, vertex1.y), 4, Color.BLACK, thickness=cv.FILLED, lineType=8)
-                cv.circle(visualised, (vertex2.x, vertex2.y), 4, Color.BLACK, thickness=cv.FILLED, lineType=8)
+    ret_image = preprocessed.copy()
+    skeleton = cv.ximgproc.thinning(preprocessed)  # skeletonize image
+    # create kernels that will extract intersection points
+    kernels_list = [
+        np.array([[1, 0, 1],
+                  [0, 1, 0],
+                  [0, 1, 0]]),
+        np.array([[0, 1, 0],
+                  [0, 1, 1],
+                  [1, 0, 0]]),
+        np.array([[1, 0, 0],
+                  [0, 1, 0],
+                  [1, 0, 1]])
+    ]
 
-    return vertices_list, topology_backend, visualised
+    for kernel in kernels_list:
+        for i in range(0, 4):  # for each orientation of kernel in list
+            intersections = cv.morphologyEx(skeleton, cv.MORPH_HITMISS, kernel)  # intersection pixels remain
+            # dilate these pixels to the thickness of an edge to create intersection regions
+            regions = cv.dilate(intersections, Kernel.k3, iterations=edge_thickness+1)
+            ret_image = cv.subtract(ret_image, regions)  # subtract intersection regions from image
+            kernel = np.rot90(kernel)  # rotate kernel to create another intersection pattern
+
+    return ret_image
 
 
-def fit_line(edge_contour: list) -> ([float, float], [float, float]):
+def lines_from_contours(preprocessed: np.ndarray, backend: np.ndarray, min_line_length: float = 10) -> (list, np.ndarray):
     """
-    Approximate edge contour with a straight line using contour operations.
-    This is achieved by finding intersections of bounding rectangle and fitted line.
-    x and y coordinates are calculated by solving system of linear equations that describe line and rectangle
+    From image with removed vertices approximate each contour with straight line
+
+    :param preprocessed: input preprocessed image with removed vertices
+    :param backend: image with visualisation of topology recognition backend
+    :param min_line_length: all approximated lines of smaller length than this value will be considered noise and not
+        added to the list of lines
+    :return: List of lines (tuples of 2 endpoints) and image with lines visualised
+    """
+    lines_list = []
+    contours, hierarchy = cv.findContours(preprocessed, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+    cv.drawContours(backend, contours, -1, Color.YELLOW, 1)
+    for i in range(0, len(contours)):
+        if hierarchy[0][i][3] == -1:  # outer contours only
+            cnt = contours[i]
+            pt1, pt2 = fit_line(cnt)
+            # if line has been fitted take lines that are long enough to be an edge
+            if pt1 is not None and pt2 is not None and np.linalg.norm(pt1 - pt2) >= min_line_length:
+                cv.circle(backend, (pt1[0], pt1[1]), 4, Color.CYAN, cv.FILLED)
+                cv.circle(backend, (pt2[0], pt2[1]), 4, Color.CYAN, cv.FILLED)
+                lines_list.append([pt1, pt2])
+    return lines_list, backend
+
+
+def fit_line(edge_contour: list, epsilon: float = 0.01, delta: float = 0.01) -> ([int, int], [int, int]):
+    """
+    Approximate edge contour with a straight line (2 endpoints) using contour approximation operation
+    This is achieved by approximating contour until 2 points remain and are treated as line endpoints
 
     :param edge_contour: set of points that describe edge contour
+    :param epsilon: initial part of contour perimieter that will be used for contour approximation
+    :param delta: step of epsilon in each loop
     :return: two endpoints of an approximating line
     """
-    rect_x, rect_y, width, height = cv.boundingRect(edge_contour)
-    vec_x, vec_y, line_x, line_y = cv.fitLine(edge_contour, cv.DIST_L2, 0, 0.01, 0.01)
-    points = []
-    if abs(vec_x) <= 0.01:  # Detected line is vertical
-        points.append((line_x, rect_y))
-        points.append((line_x, rect_y + height))
-    elif abs(vec_y) <= 0.01:    # Detected line is horizontal
-        points.append((rect_x, line_y))
-        points.append((rect_x + width, line_y))
-    else:   # Detected line is oblique
-        # Calculate intersection points on horizontal lines (x coordinates):
-        # y = rect_y (top rectangle line)
-        # y = rect_y + height (bottom rectangle line)
-        top_intersect = ((rect_y - line_y) * vec_x / vec_y + line_x)
-        bottom_intersect = ((rect_y + height - line_y) * vec_x / vec_y + line_x)
-        # and vertical lines (y coordinates):
-        # x = rect_x (left rectangle line)
-        # x = rect_x + width (right rectangle line)
-        left_intersect = ((rect_x - line_x) * vec_y / vec_x + line_y)
-        right_intersect = ((rect_x + width - line_x) * vec_y / vec_x + line_y)
 
-        # Find those 2 intersections that occur on rectangle line segments
-        # horizontal:
-        if rect_x <= top_intersect <= rect_x + width:
-            points.append([top_intersect, rect_y])
-        if rect_x <= bottom_intersect <= rect_x + width:
-            points.append([bottom_intersect, rect_y + height])
-        # vertical
-        if rect_y <= left_intersect <= rect_y + height:
-            points.append([rect_x, left_intersect])
-        if rect_y <= right_intersect <= rect_y + height:
-            points.append([rect_x + width, right_intersect])
+    perimeter = cv.arcLength(edge_contour, True)
+    while True:
+        approx = cv.approxPolyDP(edge_contour, perimeter * epsilon, True)
+        if len(approx) <= 2:
+            break
+        epsilon += delta
+    if len(approx) == 2:  # exactly 2 (end)points remained
+        return approx[0][0].astype(int), approx[1][0].astype(int)
 
-    return np.array(points[0], dtype=float), np.array(points[1], dtype=float)
+    # approximation failure - left one or less points
+    return None, None
+
+
+def link_nearby_endpoints(lines_list: list, backend: np.ndarray, search_radius: float, angle_threshold: float) \
+        -> (list, np.ndarray):
+    """
+    Link edge segments (lines) that are close to each other and go at a similar angle. This operation is performed
+    because sometimes, one edge is separated into multiple lines (e.g. when intersections occur)
+
+    :param lines_list: list of lines (tuples of 2 endpoints)
+    :param backend: source image with visualised topology recognition backend
+    :param search_radius: radius determining area around endpoint that other endpoint of other line has to be in to
+        be considered a "nearby" endpoint
+    :param angle_threshold: threshold that describes upper limit for angle (in degrees)
+        that lines of 2 nearby endpoints have to be at to be linked
+    :return: list of lines, where nearby line segments are connected into single lines also visualised results
+    """
+    i = 0
+    while i < len(lines_list):
+        if lines_list[i] is None:  # skip already linked lines
+            i += 1
+            continue
+        line = lines_list[i]
+        for j in range(0, len(line)):  # for each one of 2 endpoints
+            main_point = line[j]  # search around this endpoint for endpoints from different lines
+            other_point = line[(j+1) % 2]  # other endpoint from the same line
+            if main_point is None or other_point is None:
+                break
+            else:
+                main_angle = vector_angle(other_point, main_point)
+                in_area_list = find_endpoints_in_area(lines_list, i+1, main_point[0], main_point[1], search_radius,
+                                                      main_angle)  # find all endpoints in area of main point
+                if in_area_list is not None:
+                    deltas = in_area_list[:, 2]  # extract angle differences into separate array
+                    min_delta = np.min(deltas)
+                    if min_delta <= angle_threshold:  # check if lines are going at a similar angle
+                        min_index = np.argmin(deltas)
+                        k, l = (int(in_area_list[min_index][0]), int(in_area_list[min_index][1]))
+                        # create linked line by assigning new value to main_point place in list
+                        lines_list[i][j] = lines_list[k][(l + 1) % 2]  # find new endpoint for main line
+                        lines_list[k] = None  # mark line as linked
+                        i -= 1  # take another iteration over current line since it has just changed
+                        break  # start new iteration with new linked line
+        i += 1
+    final_lines_list = []
+    for line in lines_list:
+        if line is None:  # remove fields in list that remained after they were linked to other lines
+            continue
+        else:  # print lines
+            final_lines_list.append(line)
+            pt1, pt2 = line
+            cv.line(backend, (pt1[0], pt1[1]), (pt2[0], pt2[1]), Color.ORANGE, 2)
+
+    return final_lines_list, backend
+
+
+def vector_angle(start_pt: [int, int], end_pt: [int, int]) -> float:
+    """
+    Calculate vector angle with Y axis in cartesian coordinate system
+
+    :param start_pt: starting point of vector
+    :param end_pt: ending point of vector
+    :return: angle in degrees that vector forms with Y axis going clockwise
+    """
+    tmp_vec = start_pt - end_pt  # calculate vector value from 2 endpoints
+    angle = np.arctan2(tmp_vec[0], tmp_vec[1]) * 180 / math.pi + 180  # calculate angle in degrees <0; 360>
+    return angle
+
+
+def find_endpoints_in_area(lines_list: list, start_index: int, x: int, y: int, radius: float, main_angle: float) \
+        -> np.ndarray:
+    """
+    Find all endpoints in circle area (center and radius given)
+    Also calculate angle difference between each line containing endpoint in area and main endpoint line
+
+    :param lines_list: list of lines (tuples of 2 endpoints)
+    :param start_index: starting index for search in lines list
+    :param x: center coordinate
+    :param y: center coordinate
+    :param radius: determines area of search
+    :param main_angle: angle of line that search point is in
+    :return: numpy array of endpoint descriptions containing (if no endpoints found empty list is returned):
+        line_index - line index in list
+        point_index - endpoint index in line (0 or 1)
+        delta - difference of angles between main line, and lines containing in_area endpoints
+    """
+    in_area_list = []
+    endpoint = np.array([x, y])
+    for i in range(start_index, len(lines_list)):
+        if lines_list[i] is None:
+            continue
+        for j in range(0, 2):
+            tmp_endpoint = np.array([lines_list[i][j][0], lines_list[i][j][1]])
+            if np.linalg.norm(endpoint - tmp_endpoint) <= radius:  # calculate distance
+                other_endpoint = np.array([lines_list[i][(j+1) % 2][0], lines_list[i][(j+1) % 2][1]])
+                tmp_angle = vector_angle(tmp_endpoint, other_endpoint)
+                diff = abs(main_angle - tmp_angle)
+                delta = diff if diff <= 180 else 360 - diff
+                in_area_list.append([i, j, delta])
+    ret_arr = np.array(in_area_list) if in_area_list else None
+    return ret_arr
+
+
+def edges_from_lines(lines_list: list, vertices_list: list, backend: np.ndarray, final_results: np.ndarray,
+                     within_r_factor: float) -> (list, np.ndarray, np.ndarray):
+    """
+    From extracted lines create edges (connections between adjacent vertices).
+
+    :param lines_list: list of lines extracted from the image
+    :param vertices_list: list of detected vertices in segmentation phase
+    :param backend: source image with visualised topology recognition backend
+    :param final_results: copy of source image used to display final results of OGR algorithm
+    :param within_r_factor: factor to increase/decrease radius and therefore area of accepting lines endpoints as edges
+    :return: list where each vertex has list of adjacent (connected) vertices,
+        images with visualised intermediate recognition steps and final results,
+    """
+    for pt1, pt2 in lines_list:
+        index1 = find_nearest_vertex(pt1, vertices_list)
+        index2 = find_nearest_vertex(pt2, vertices_list)
+        v1, v2 = (vertices_list[index1], vertices_list[index2])
+        # visualise "within areas"
+        cv.circle(backend, (v1.x, v1.y), round(v1.r * within_r_factor), Color.PURPLE, thickness=2)
+        cv.circle(backend, (v2.x, v2.y), round(v2.r * within_r_factor), Color.PURPLE, thickness=2)
+        # check if:
+        # 1. points are within vertex area,
+        # 2. edge endpoints are assigned to different vertices,
+        # 3. connection doesn't already exists
+        if point_within_radius(pt1, v1, within_r_factor) and point_within_radius(pt2, v2, within_r_factor)\
+                and index1 != index2\
+                and index2 not in v1.adjacency_list and index1 not in v2.adjacency_list:
+            v1.adjacency_list.append(index2)  # create adjacency
+            v2.adjacency_list.append(index1)  # ---||---
+            cv.line(final_results, (v1.x, v1.y), (v2.x, v2.y), Color.RED, thickness=2)  # final edge
+            cv.circle(final_results, (v1.x, v1.y), 4, Color.BLACK, cv.FILLED)           # edge endpoint
+            cv.circle(final_results, (v2.x, v2.y), 4, Color.BLACK, cv.FILLED)           # --||--
+
+    return vertices_list, backend, final_results
 
 
 def find_nearest_vertex(point: np.ndarray, vertices_list: list) -> int:
@@ -178,13 +319,9 @@ def point_within_radius(point: np.ndarray, vertex: Vertex, radius_factor: float)
 
     :param point: x and y coordinates
     :param vertex: vertex which area is considered
-    :param radius_factor: factor to increase/decrease radius and therefor area
+    :param radius_factor: factor to increase/decrease radius and therefore area
     :return: True if point is within radius, and False if it is not
     """
     radius = vertex.r * radius_factor
     center = np.array([vertex.x, vertex.y])
-    if np.linalg.norm(point-center) <= radius:
-        return True
-    else:
-        return False
-
+    return True if np.linalg.norm(point-center) <= radius else False

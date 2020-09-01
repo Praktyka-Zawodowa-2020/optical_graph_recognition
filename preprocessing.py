@@ -24,15 +24,14 @@ MODE_THRESHOLD: float = 10  # min average distance of bg pixels to object pixels
 DBG_TITLE = "preprocessing: "
 
 
-def preprocess(source: np.ndarray, debug: Debug, mode: int) -> (np.ndarray, np.ndarray, Mode):
-
+def preprocess(source: np.ndarray, mode: Mode, debug: Debug) -> (np.ndarray, np.ndarray, Mode, bool):
     """
     Processes source image by reshaping, thresholding, transforming and cropping.
     If auto mode has been selected, choose mode automatically
 
     :param source: input image
+    :param mode: input type, see shared.py for more detailed description
     :param debug: indicates how much debugging windows will be displayed
-    :param mode: GRID_BG, CLEAN_BG, PRINTED
     :return: reshaped and fully preprocessed images, changed (if mode is AUTO) or unchanged mode, rotation flag
     """
     # Reshape image to standard resolution
@@ -152,13 +151,13 @@ def chose_mode(binary_image: np.ndarray) -> Mode:
         return Mode.CLEAN_BG
 
 
-def transform(binary_image: np.ndarray, thresh_val: int, mode: int) -> np.ndarray:
+def transform(binary_image: np.ndarray, thresh_val: int, mode: Mode) -> np.ndarray:
     """
     Filter image from noise (and sometimes grid) by performing various transformations depending on mode parameter.
 
     :param binary_image: input binary image
     :param thresh_val: value from thresholding, indicates if global thresholding had been successful
-    :param mode: indicates properties of input photo (see shared.py for details)
+    :param mode: input type, see shared.py for more detailed description
     :return: Transformed (filtered) image
     """
     if mode == Mode.GRID_BG:  # grid and noise are filtered from the picture

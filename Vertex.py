@@ -10,7 +10,7 @@ class Vertex:
         r (float): radius
         is_filled (bool): flag indicating if vertex is filled
         color (int, int, int): bgr color
-        neighbour_list (list): list of connected vertices
+        adjacency_list (list): list of adjacent (connected) vertices
     """
     id = -1
     x = -1
@@ -18,7 +18,7 @@ class Vertex:
     r = -1.0
     is_filled = False
     color = (-1, -1, -1)
-    neighbour_list = []
+    adjacency_list = []
 
     def __init__(self, x, y, r, is_filled, color):
         self.x = x
@@ -26,4 +26,4 @@ class Vertex:
         self.r = r
         self.is_filled = is_filled
         self.color = color
-        self.neighbour_list = []
+        self.adjacency_list = []

@@ -18,7 +18,7 @@ COLOR_R_FACTOR: float = 0.4  # Should be < 1.0
 COLOR_THRESHOLD: float = 0.2
 
 VERTEX_AREA_UPPER: float = 0.1
-VERTEX_AREA_LOWER: float = 0.0003
+VERTEX_AREA_LOWER: float = 0.00015
 
 ROUND_RATIO: float = 3.0
 MIN_FILL: float = 0.5
@@ -27,22 +27,25 @@ MIN_FILL: float = 0.5
 DBG_TITLE = "segmentation: "
 
 
-def segment(source: np.ndarray, preprocessed: np.ndarray, debug: Debug, mode: int) -> [list, np.ndarray]:
+def segment(source: np.ndarray, preprocessed: np.ndarray, mode: Mode, debug: Debug) \
+        -> [list, np.ndarray, np.ndarray, int]:
     """
     Detect vertices in preprocessed image and return them in a list
 
     :param source: resized input image
     :param preprocessed: fully preprocessed image
-    :param debug: indicates how much debugging windows will be displayed
     :param mode: input type, see shared.py for more detailed description
-    :return vertices_list: list of detected Vertices (objects of Vertex class), visualised results of detection
-        and modified preprocessed image for topology recognition
+    :param debug: indicates how much debugging windows will be displayed
+    :return vertices_list: list of detected Vertices (objects of Vertex class),
+        visualised results of detection
+        modified preprocessed image for topology recognition
+        edge_thickness - which is number of erosion iterations required to remove edges with k3 Kernel
 
     """
     # fill unfilled vertices
     filled = fill_vertices(preprocessed, mode)
     # remove edges
-    edgeless = remove_edges(filled)
+    edgeless, edge_thickness = remove_edges(filled)
 
     # detect vertices
     if mode == Mode.PRINTED:
@@ -55,13 +58,13 @@ def segment(source: np.ndarray, preprocessed: np.ndarray, debug: Debug, mode: in
     # Display intermediate and final results of segmentation
     if debug == Debug.FULL:
         cv.imshow(DBG_TITLE+"empty vertices filled", filled)
-        cv.imshow(DBG_TITLE+"edges removed", edgeless)
+        cv.imshow(DBG_TITLE+"edges removed after " + str(edge_thickness) + " erosions", edgeless)
         cv.imshow(DBG_TITLE+str(len(vertices_list)) + " detected vertices", visualised)
 
-    return vertices_list, visualised, preprocessed
+    return vertices_list, visualised, preprocessed, edge_thickness
 
 
-def fill_vertices(image: np.ndarray, mode: int) -> np.ndarray:
+def fill_vertices(image: np.ndarray, mode: Mode) -> np.ndarray:
     """
     Detect unfilled vertices in preprocessed image
     Return image with vertices filled with object color
@@ -190,7 +193,7 @@ def get_hough_param(image: np.ndarray, round_ratio: float = ROUND_RATIO) -> (int
     """
     edgeless = image.copy()
 
-    edgeless = remove_edges(edgeless)
+    edgeless, _ = remove_edges(edgeless)
     contours, hierarchy = cv.findContours(edgeless, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
 
     radius_list = []
@@ -241,17 +244,18 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
 
     :param image: preprocessed image with filled vertices
     :return dilated: image without edges (only vertices pixels)
+        K value which is approximation of edges thickness
     """
     eroded_contours = image.copy()
     eroded = image.copy()
     contours_list = []
 
     # Calculation of the number of contours after successive erosions
+
     while True:
         contours, _ = cv.findContours(eroded_contours, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         if len(contours) == 0:
             break
-
         contours_list.append(len(contours))
         eroded_contours = cv.erode(eroded_contours, Kernel.k3, iterations=1)
 
@@ -276,12 +280,14 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     if position_max == 0:
         position_max = current_position
 
-    K = position_max
+    K = position_max if position_max > 0 else floor(len(contours_list)*0.5)
     # eroded k times
     eroded = cv.erode(eroded, Kernel.k3, iterations=K)
     # dilating k times
     dilated = cv.dilate(eroded, Kernel.k3, iterations=K)
-    return dilated
+    # fill small regions between parts of single vertex
+    edges_removed = cv.morphologyEx(dilated, cv.MORPH_CLOSE, Kernel.k5, iterations=1)
+    return edges_removed, K
 
 
 def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.ndarray,
@@ -304,6 +310,7 @@ def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.nda
     vertices_list = []
     visualized = np.copy(source)
     preprocessed_cp = preprocessed.copy()
+    image_area = edgeless.shape[0] * edgeless.shape[1]
     for i in range(0, len(contours)):
         if hierarchy[0][i][3] == -1:  # outer contours
             cnt = contours[i]
@@ -313,8 +320,9 @@ def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.nda
                 x, y, r = (int(x), int(y), int(r * 1.05))
 
                 fill_ratio = circle_fill_ratio(edgeless, x, y, r)
+
                 if fill_ratio >= min_fill \
-                        and cv.contourArea(cnt) <= edgeless.shape[0] * edgeless.shape[1] * VERTEX_AREA_UPPER:
+                        and image_area * VERTEX_AREA_UPPER >= cv.contourArea(cnt) >= image_area * VERTEX_AREA_LOWER:
                     # determining vertex color
                     is_filled, color = vertex_color_fill(cv.medianBlur(preprocessed, 5), source, x, y, r, COLOR_R_FACTOR, COLOR_THRESHOLD)
                     vertices_list.append(Vertex(x, y, r, is_filled, color))  # creating Vertex from data
