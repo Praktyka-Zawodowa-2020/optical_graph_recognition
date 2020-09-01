@@ -32,7 +32,7 @@ def graph6_format(vertex: List[Vertex], save_path: str):
         vertex[i].id = i
 
     for V in vertex:
-        for W in V.neighbour_list:
+        for W in V.adjacency_list:
             adjacency_matrix[V.id][W] = 1
 
     for i in range(0, size):
@@ -123,8 +123,8 @@ def graphml_format(vertex: List[Vertex], save_path: str, is_rotated: bool):
         node = node + '</node>\n'
         f.write(node)
 
-        # completing the neighborhood matrix
-        for W in V.neighbour_list:
+        # completing the adjacency matrix
+        for W in V.adjacency_list:
             adjacency_matrix[V.id][W] = 1
 
     nr = 0

@@ -21,16 +21,16 @@ def main():
     if source is not None:  # read successful, process image
 
         # 1st step - preprocessing
-        source, preprocessed, mode, is_rotated = preprocess(source, debug, mode)
+        source, preprocessed, mode, is_rotated = preprocess(source, mode, debug)
 
         # 2nd step - segmentation
-        vertices_list, visualised, preprocessed = segment(source, preprocessed, debug, mode)
+        vertices_list, visualised, preprocessed, edge_thickness = segment(source, preprocessed, mode, debug)
         if len(vertices_list) == 0:
             print("1: No vertices found")
             return -1
 
         # 3rd step - topology recognition
-        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, debug)
+        vertices_list = recognize_topology(vertices_list, preprocessed, visualised, edge_thickness, mode, debug)
 
         # 4th step - postprocessing
         postprocess(vertices_list, save_path, is_rotated)
