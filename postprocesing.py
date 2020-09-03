@@ -26,7 +26,7 @@ def graph6_format(vertex: List[Vertex], save_path: str):
     save_path = save_path + '.g6'
     f = open(save_path, "wb")
     size = len(vertex)
-    adjacency_matrix = [[0 for x in range(size)] for y in range(size)]
+    adjacency_matrix = [[0 for _ in range(size)] for _ in range(size)]
     adjacency_list = []
     for i in range(0, size):
         vertex[i].id = i
@@ -104,7 +104,7 @@ def graphml_format(vertex: List[Vertex], save_path: str, is_rotated: bool):
     f.write(graph_node)
 
     size = len(vertex)
-    adjacency_matrix = [[0 for x in range(size)] for y in range(size)]
+    adjacency_matrix = [[0 for _ in range(size)] for _ in range(size)]
     for i in range(0, size):
         vertex[i].id = i
 
@@ -113,7 +113,7 @@ def graphml_format(vertex: List[Vertex], save_path: str, is_rotated: bool):
         node = '<node id="n' + str(V.id) + '">\n'
         node = node + '<data key="d0">\n'
         node = node + '<y:ShapeNode>\n'
-        vx, vy = (V.x, V.y) if not is_rotated else (V.y, -V.x)  # if rotation took place remove rotation
+        vx, vy = (V.x, V.y) if not is_rotated else (V.y, -V.x)  # if rotation took place inverse rotation
         node = node + '<y:Geometry height="30.0" width="30.0" x="' + str(vx) + '" y="' + str(vy) + '"/>\n'
         node = node + '<y:Fill color="#'+color_string(V.color)+'" transparent="'+('false' if V.is_filled else 'true') + '"/>\n'
         node = node + '<y:BorderStyle color="#000000" type="line" width="4.0"/>\n'

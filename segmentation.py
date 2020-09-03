@@ -2,9 +2,9 @@
 import cv2 as cv
 import numpy as np
 
-from math import ceil, floor, sqrt
+from math import ceil, floor
 from Vertex import Vertex
-from shared import Color, Kernel, Mode, Debug
+from shared import Color, Kernel, Mode, Debug, distance_L2
 
 # Constants for HoughCircles function
 MAX_R_FACTOR: float = 0.04
@@ -52,13 +52,13 @@ def segment(source: np.ndarray, preprocessed: np.ndarray, mode: Mode, debug: Deb
         vertices_list, visualised, preprocessed = find_vertices(source, preprocessed, edgeless, 1.5, 0.55)
     elif mode == Mode.CLEAN_BG:
         vertices_list, visualised, preprocessed = find_vertices(source, preprocessed, edgeless, 1.75, 0.35)
-    elif mode == Mode.GRID_BG:
+    else:  # mode == Mode.GRID_BG:
         vertices_list, visualised, preprocessed = find_vertices(source, preprocessed, edgeless, 1.75, 0.35)
 
     # Display intermediate and final results of segmentation
     if debug == Debug.FULL:
         cv.imshow(DBG_TITLE+"empty vertices filled", filled)
-        cv.imshow(DBG_TITLE+"edges removed after " + str(edge_thickness) + " erosions", edgeless)
+        cv.imshow(DBG_TITLE+"edges removed after " + str(edge_thickness) + " erosion iterations", edgeless)
         cv.imshow(DBG_TITLE+str(len(vertices_list)) + " detected vertices", visualised)
 
     return vertices_list, visualised, preprocessed, edge_thickness
@@ -236,7 +236,7 @@ def fill_small_contours(image: np.ndarray, max_area_factor: float) -> np.ndarray
     return image
 
 
-def remove_edges(image: np.ndarray) -> np.ndarray:
+def remove_edges(image: np.ndarray) -> (np.ndarray, int):
     """
     Remove graph edges by performing erosion and dilation K times.
     K is found by finding the beginning of the longest series of constant number of contours
@@ -253,7 +253,7 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     # Calculation of the number of contours after successive erosions
 
     while True:
-        contours, _ = cv.findContours(eroded_contours, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv.findContours(eroded_contours, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
         if len(contours) == 0:
             break
         contours_list.append(len(contours))
@@ -280,14 +280,14 @@ def remove_edges(image: np.ndarray) -> np.ndarray:
     if position_max == 0:
         position_max = current_position
 
-    K = position_max if position_max > 0 else floor(len(contours_list)*0.5)
+    k_val = position_max if position_max > 0 else floor(len(contours_list)*0.5)
     # eroded k times
-    eroded = cv.erode(eroded, Kernel.k3, iterations=K)
+    eroded = cv.erode(eroded, Kernel.k3, iterations=k_val)
     # dilating k times
-    dilated = cv.dilate(eroded, Kernel.k3, iterations=K)
+    dilated = cv.dilate(eroded, Kernel.k3, iterations=k_val)
     # fill small regions between parts of single vertex
     edges_removed = cv.morphologyEx(dilated, cv.MORPH_CLOSE, Kernel.k5, iterations=1)
-    return edges_removed, K
+    return edges_removed, k_val
 
 
 def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.ndarray,
@@ -324,11 +324,12 @@ def find_vertices(source: np.ndarray, preprocessed: np.ndarray, edgeless: np.nda
                 if fill_ratio >= min_fill \
                         and image_area * VERTEX_AREA_UPPER >= cv.contourArea(cnt) >= image_area * VERTEX_AREA_LOWER:
                     # determining vertex color
-                    is_filled, color = vertex_color_fill(cv.medianBlur(preprocessed, 5), source, x, y, r, COLOR_R_FACTOR, COLOR_THRESHOLD)
+                    is_filled, color = vertex_color_fill(cv.medianBlur(preprocessed, 5), source, x, y, r,
+                                                         COLOR_R_FACTOR, COLOR_THRESHOLD)
                     vertices_list.append(Vertex(x, y, r, is_filled, color))  # creating Vertex from data
                     # creating visual representation of detected vertices
-                    if is_filled:
-                        cv.circle(visualized, (x, y), r, color, cv.FILLED, 8, 0)
+                    color = color if is_filled else Color.WHITE
+                    cv.circle(visualized, (x, y), r, color, cv.FILLED, 8, 0)
                     thickness = 1 if is_filled else 2
                     cv.circle(visualized, (x, y), r, Color.GREEN, thickness, 8, 0)
                     # cv.putText(visualized, "F", (abs(x-10), abs(y+10)), cv.QT_FONT_NORMAL, 1.0, Color.GREEN)
@@ -379,7 +380,7 @@ def extract_circle_area(image: np.ndarray, x: int, y: int, r: int) -> np.ndarray
         # in inner circle area count black and white pixels to find dominant color
         for y_iter in range(top, bottom):
             for x_iter in range(left, right):
-                distance = round(sqrt((x - x_iter) ** 2 + (y - y_iter) ** 2))
+                distance = round(distance_L2([x, y], [x_iter, y_iter]))
                 if distance <= r:
                     pixel_list.append(image[y_iter][x_iter])
     return np.array(pixel_list) if len(pixel_list) > 0 else None
@@ -411,6 +412,3 @@ def vertex_color_fill(binary: np.ndarray, source: np.ndarray, x: int, y: int, r:
     r = np.average(pixel_arr[:, 2])
 
     return is_filled, (int(b), int(g), int(r))
-
-
-
