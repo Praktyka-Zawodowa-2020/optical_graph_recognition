@@ -1,5 +1,6 @@
 """Module containing global constants, functions, ..."""
 import numpy as np
+from math import sqrt
 
 
 class Mode:
@@ -88,3 +89,14 @@ class Kernel:
     k3 = np.ones((3, 3), dtype=np.uint8)
     k5 = np.ones((5, 5), dtype=np.uint8)
     k7 = np.ones((7, 7), dtype=np.uint8)
+
+
+def distance_L2(point1: [float, float], point2: [float, float]) -> float:
+    """
+    Calculate euclidean (L2) distance between 2 points given in cartesian coordinate system
+
+    :param point1:
+    :param point2:
+    :return: distance (euclidean - L2) between points'
+    """
+    return sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)

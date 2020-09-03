@@ -2,8 +2,7 @@
 import cv2 as cv
 import numpy as np
 
-from math import sqrt
-from shared import Kernel, Color, Mode, Debug
+from shared import Kernel, Color, Mode, Debug, distance_L2
 
 # constants:
 # for threshold function
@@ -278,7 +277,7 @@ def remove_margins(binary_image: np.ndarray) -> np.ndarray:
 
     # remove detected margins
     processed = binary_image.copy()
-    diagonal_len = sqrt(processed.shape[1] ** 2 + processed.shape[0] ** 2)
+    diagonal_len = distance_L2([0, 0], [processed.shape[1], processed.shape[0]])
     for lines in margin_lines:
         if lines is not None:
             for line in lines:  # convert each line from Polar to Cartesian coordinate system
@@ -321,83 +320,83 @@ def crop_bg_padding(binary_transformed: np.ndarray, images: list, padding: int =
     return binary_transformed, images
 
 
-def delete_characters(image: np.ndarray) -> np.ndarray:
-    """
-    Remove "characters" (noise) of small sizes
-
-    :param transformed: binarized and transformed input image
-    :return: Image without noise
-    """
-    image_copy = image.copy()
-    height, width = image_copy.shape[:2]
-
-    contours, hierarchy = cv.findContours(image_copy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-
-    for contour in contours:
-        wider_clipping = False
-        hist2 = []
-        # get rectangle bounding contour
-        [x, y, w, h] = cv.boundingRect(contour)
-
-        # if possible cut out the contour wider and longer than found
-        if 1 < x and (x + w + 4) < width and 1 < y and (y + h + 4) < height:
-            x = x - 2
-            y = y - 2
-            w = w + 4
-            h = h + 4
-            wider_clipping = True
-        crop_image = image_copy[y: y + h, x: x + w].copy()
-
-        # if empty vertices of the graph have a thick edge,
-        # the findContours function draws the contours inside and outside the vertex.
-        # When calculating the average distance of white pixels from the center of the cut image,
-        # we filter out the contours detected inside the vertex
-        white_img = np.zeros([h, w, 1], dtype=np.uint8)
-        white_img.fill(255)
-        white_img[int(h / 2)][int(w / 2)] = 0
-        dst = cv.distanceTransform(white_img, cv.DIST_C, 3, cv.DIST_LABEL_PIXEL)
-        avarage = cv.mean(dst, mask=crop_image)
-
-        if avarage[0] < 0.4 * ((h + w) / 2):
-
-            # sometimes when the vertex contour is thin,
-            # "cv.HoughCircles" does not detect it,
-            # so when counting the histogram for the eroded image,
-            # we ignore such vertices (unfortunately such a filter also leaves noises)
-            cv.rectangle(crop_image, (0, 0), (w - 1, h - 1), 0, 1)
-            eroded = cv.erode(crop_image, Kernel.k3, iterations=1)
-            hist = cv.calcHist([eroded], [0], None, [256], [0, 256])
-            if hist[255] / (hist[255] + hist[0]) > 0.005:
-                # recognition of vertices in the cut image
-                circles = cv.HoughCircles(crop_image, cv.HOUGH_GRADIENT, 1, 20,
-                                          param1=30,
-                                          param2=20,
-                                          minRadius=0,
-                                          maxRadius=0)
-                if circles is not None:
-                    continue
-
-                # recognition of lines in the cut image
-                lines = cv.HoughLinesP(crop_image, 2, np.pi / 180, 40, 0, 0)
-                is_edge = False
-                if lines is not None:
-                    black_img = np.zeros([h, w], dtype=np.uint8)
-                    for j in range(0, len(lines)):
-                        x1 = lines[j][0][0]
-                        y1 = lines[j][0][1]
-                        x2 = lines[j][0][2]
-                        y2 = lines[j][0][3]
-                        length = sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-                        if length > 15 and w * h > 625:
-                            is_edge = True
-                            cv.line(black_img, (x1, y1), (x2, y2), 255, 2)
-                    # we calculate the difference of the image cut out and with the lines marked,
-                    # and then the histogram of the resulting image
-                    # such an algorithm allows you to filter out contours containing the edges of the graph
-                    sub_image = crop_image-black_img
-                    hist2 = cv.calcHist([sub_image], [0], None, [256], [0, 256])
-
-                if (is_edge is True and hist2[255] / (hist2[255] + hist2[0]) > 0.08) or is_edge is False:
-                    cv.drawContours(image_copy, [contour], -1, 0, -1)
-
-    return image_copy
+# def delete_characters(image: np.ndarray) -> np.ndarray:
+#     """
+#     Remove "characters" (noise) of small sizes
+#
+#     :param transformed: binarized and transformed input image
+#     :return: Image without noise
+#     """
+#     image_copy = image.copy()
+#     height, width = image_copy.shape[:2]
+#
+#     contours, hierarchy = cv.findContours(image_copy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+#
+#     for contour in contours:
+#         wider_clipping = False
+#         hist2 = []
+#         # get rectangle bounding contour
+#         [x, y, w, h] = cv.boundingRect(contour)
+#
+#         # if possible cut out the contour wider and longer than found
+#         if 1 < x and (x + w + 4) < width and 1 < y and (y + h + 4) < height:
+#             x = x - 2
+#             y = y - 2
+#             w = w + 4
+#             h = h + 4
+#             wider_clipping = True
+#         crop_image = image_copy[y: y + h, x: x + w].copy()
+#
+#         # if empty vertices of the graph have a thick edge,
+#         # the findContours function draws the contours inside and outside the vertex.
+#         # When calculating the average distance of white pixels from the center of the cut image,
+#         # we filter out the contours detected inside the vertex
+#         white_img = np.zeros([h, w, 1], dtype=np.uint8)
+#         white_img.fill(255)
+#         white_img[int(h / 2)][int(w / 2)] = 0
+#         dst = cv.distanceTransform(white_img, cv.DIST_C, 3, cv.DIST_LABEL_PIXEL)
+#         avarage = cv.mean(dst, mask=crop_image)
+#
+#         if avarage[0] < 0.4 * ((h + w) / 2):
+#
+#             # sometimes when the vertex contour is thin,
+#             # "cv.HoughCircles" does not detect it,
+#             # so when counting the histogram for the eroded image,
+#             # we ignore such vertices (unfortunately such a filter also leaves noises)
+#             cv.rectangle(crop_image, (0, 0), (w - 1, h - 1), 0, 1)
+#             eroded = cv.erode(crop_image, Kernel.k3, iterations=1)
+#             hist = cv.calcHist([eroded], [0], None, [256], [0, 256])
+#             if hist[255] / (hist[255] + hist[0]) > 0.005:
+#                 # recognition of vertices in the cut image
+#                 circles = cv.HoughCircles(crop_image, cv.HOUGH_GRADIENT, 1, 20,
+#                                           param1=30,
+#                                           param2=20,
+#                                           minRadius=0,
+#                                           maxRadius=0)
+#                 if circles is not None:
+#                     continue
+#
+#                 # recognition of lines in the cut image
+#                 lines = cv.HoughLinesP(crop_image, 2, np.pi / 180, 40, 0, 0)
+#                 is_edge = False
+#                 if lines is not None:
+#                     black_img = np.zeros([h, w], dtype=np.uint8)
+#                     for j in range(0, len(lines)):
+#                         x1 = lines[j][0][0]
+#                         y1 = lines[j][0][1]
+#                         x2 = lines[j][0][2]
+#                         y2 = lines[j][0][3]
+#                         length = sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+#                         if length > 15 and w * h > 625:
+#                             is_edge = True
+#                             cv.line(black_img, (x1, y1), (x2, y2), 255, 2)
+#                     # we calculate the difference of the image cut out and with the lines marked,
+#                     # and then the histogram of the resulting image
+#                     # such an algorithm allows you to filter out contours containing the edges of the graph
+#                     sub_image = crop_image-black_img
+#                     hist2 = cv.calcHist([sub_image], [0], None, [256], [0, 256])
+#
+#                 if (is_edge is True and hist2[255] / (hist2[255] + hist2[0]) > 0.08) or is_edge is False:
+#                     cv.drawContours(image_copy, [contour], -1, 0, -1)
+#
+#     return image_copy

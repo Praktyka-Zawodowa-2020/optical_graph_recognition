@@ -14,7 +14,7 @@ def parse_argument(args) -> (int, str, str):
     """
     Parses the command line arguments
 
-    :param: args: Comand line arguments
+    :param: args: Command line arguments
     :return: mode, path to photo, path to save the result
     """
     save_path = parse_path(args.path)
@@ -47,4 +47,3 @@ def parse_path(file_path: str) -> str:
         return ''
     save_path = head + '/' + file_name
     return save_path
-
