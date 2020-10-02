@@ -7,13 +7,15 @@ Table of contents:
 - [Introduction](#introduction)
 - [Technologies](#technologies)
 - [Running the script](#running-the-script)
-- [Recognition phases](#recognition-phases)
-  * [Preprocessing](#preprocessing)
+- [Processing phases](#processing-phases)
+  * [Preprocessing](#preprocessing) 
   * [Segmentation](#segmentation)
   * [Topology recognition](#topology-recognition)
   * [Postprocessing](#postprocessing)
 - [Future development](#future-development)
 - [References and Authors](#references-and-authors)
+
+<img align="right" width="62%" src="./readme_imgs/input_and_output.jpg">
 
 ## Introduction
 
@@ -60,9 +62,9 @@ including [mobile application](https://github.com/Praktyka-Zawodowa-2020/optical
 [server](https://github.com/Praktyka-Zawodowa-2020/optical_graph_recognition_server) on which the file format is 
 validated. Therefore in order for the script to work independently:
 
-```Make sure that your input files are images and have .jpg or .png extensions!```
+**Make sure that your input files are images and have .jpg or .png extensions!**
 
-###Arguments
+### Arguments
 You can read arguments descriptions below or display them by typing in the command line:
 
 `python <path_to_main.py> -h`
@@ -98,11 +100,11 @@ and with the same name as input image. Those file types are briefly described be
 - [graph6 (.g6)](http://users.cecs.anu.edu.au/~bdm/data/formats.html) - stores only logical information about vertices 
 and edges (equivalent to adjacency matrix),
 - [GraphML (.graphml)](https://docs.yworks.com/yfiles/doc/developers-guide/graphml.html) - in addition to logical 
-information stores visual and geometrical properties (vertex center coordinates, its color, ...).
+information stores visual and geometrical properties (vertex center coordinates, its color, etc.).
 
 ![cmd_example](./readme_imgs/cmd_example.jpg)
 
-## Recognition phases
+## Processing phases
 Image processing has been divided into 4 phases, that work in the simple pipeline:
 
 `Preprocessing -> Segmentation -> Topology Recognition -> Postprocessing`
@@ -140,12 +142,12 @@ In this phase edges are recognised (connections between vertices) in following s
 4. Edges are created by linking line segments
 5. Connection between vertices are assigned to adjacency list
 
-Topology recognition updates each vertex in a list with information about adjacent vertices. Updated list is the input 
+Topology recognition updates each vertex object in a list with information about adjacent vertices. Updated list is the input 
 for Postprocessing phase (visualisation from `full` debug below).
 
 ![topology_recognition](./readme_imgs/topology_recognition.jpg)
 ### Postprocessing
-In the postprocessing phase 2 files storing graph information are created from adjacency list (description in 
+In the postprocessing phase 2 files, storing graph information, are created from adjacency list (description in 
 [Command line](#command-line) paragraph). GraphML file is created accordingly to 
 [yWorks documentation](https://docs.yworks.com/yfiles/doc/developers-guide/graphml.html) and graph6 file accordingly to 
 [official documentation](http://users.cecs.anu.edu.au/~bdm/data/formats.txt).
@@ -154,9 +156,10 @@ In the postprocessing phase 2 files storing graph information are created from a
 There are definitely some features to improve, especially handling the intersections which could be improved by 
 storing removed intersection points coordinates, and later using these points to link segments into edges.
 File extension validation can also be implemented, as well as working with relative paths to input image. If you want
-to further develop this solution remember that we created it during apprenticeship at the Gdansk University of Technology and
-as far as I know this code is their intellectual property (so its best to contact our 
-[project coordinator](https://pg.edu.pl/7c4980df68_kacper.wereszko/wizytowka), at email address: kacper.wereszko@pg.edu.pl).
+to further develop this solution remember that we created it during apprenticeship at the [Gdansk University of 
+Technology](https://pg.edu.pl/en) and as far as I know this code is their intellectual property (so its best to contact 
+our [project coordinator](https://pg.edu.pl/7c4980df68_kacper.wereszko/wizytowka), at email address: 
+kacper.wereszko@pg.edu.pl).
 
 ## References and Authors
 The idea for OGR, and some adapted solutions were taken from publication: 
@@ -167,8 +170,8 @@ Some ideas and solutions have been taken and adapted from
 [yWorks article](https://www.yworks.com/blog/projects-optical-graph-recognition) about "Recognizing graphs from images".
 
 A lot of solutions and knowledge about opencv has been taken from 
-[opencv python tutorials](https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_tutorials.html).
+[offical opencv python tutorials](https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_tutorials.html).
 
-This solution has been mainly developed during summer 2020 one month apprenticeship at the Gdansk University of 
-Technology (GUT) by:
+This solution has been mainly developed during summer 2020 one month apprenticeship at the [Gdansk University of 
+Technology (GUT)](https://pg.edu.pl/en) by:
 #### Filip Chodziutko and Kacper Nowakowski 2020
