@@ -5,7 +5,8 @@ from shared import Mode, Debug
 
 # instance of parser for reading cli arguments
 parser = argparse.ArgumentParser("Optical graph recognition")
-parser.add_argument("-p", "--path", help="Path to file")
+
+parser.add_argument("-p", "--path", help="Absolute path to input image", required=True)
 parser.add_argument("-m", "--mode", help=Mode.HELP, choices=Mode.CHOICES, default=Mode.DEFAULT, type=str.lower)
 parser.add_argument("-d", "--debug", help=Debug.HELP, choices=Debug.CHOICES, default=Debug.DEFAULT, type=str.lower)
 

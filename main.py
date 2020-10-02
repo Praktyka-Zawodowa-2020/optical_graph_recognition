@@ -6,7 +6,7 @@ from argsparser import parser, parse_argument
 from preprocessing import preprocess
 from segmentation import segment
 from topology_recognition import recognize_topology
-from postprocesing import postprocess
+from postprocessing import postprocess
 
 
 def main():

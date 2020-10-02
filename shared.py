@@ -4,15 +4,16 @@ from math import sqrt
 
 
 class Mode:
-    """Input mode indicates visual properties of given graph photo, see HELP below for details"""
+    """Input mode indicates visual properties of given graph photo"""
     HELP = '''
-        grid_bg - Hand drawn graph on grid/lined piece of paper (grid/lined notebook etc.) 
+        Input mode indicates visual properties of given graph photo:
+        grid_bg - Hand drawn graph on grid/lined piece of paper (grid/lined notebook etc.)
         clean_bg - Hand drawn graph on empty uniform color background (on board, empty piece of paper, editor (paint))
-        printed - Printed graph (e.g. from paper, publication, book...)
-        auto - Mode is chosen automatically between GRID_BG and CLEAN_BG    
+        printed - Graph from a printed source (e.g. from a paper, a publication, a book, etc.)
+        auto - Mode is chosen automatically between grid_bg and clean_bg modes
     '''
     CHOICES = ['grid_bg', 'clean_bg', 'printed', 'auto']
-    DEFAULT = 'clean_bg'
+    DEFAULT = 'auto'
 
     GRID_BG = CHOICES.index('grid_bg')
     CLEAN_BG = CHOICES.index('clean_bg')
@@ -38,9 +39,10 @@ class Mode:
 class Debug:
     """Debug mode indicates how much debugging information will be displayed"""
     HELP = '''
-        no - no windows with debugging information are displayed
-        general - only windows with general debugging information are displayed
-        full - all windows with debugging information are displayed
+        Debug mode indicates how much debugging information will be displayed:
+        - no - no windows with debugging information are displayed
+        - general - only windows with general debugging information are displayed
+        - full - all windows with debugging information are displayed
     '''
     CHOICES = ['no', 'general', 'full']
     DEFAULT = 'no'
