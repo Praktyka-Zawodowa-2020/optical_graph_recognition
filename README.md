@@ -3,6 +3,8 @@ Our OGR implementation is a python algorithm for recognising graphs
 ([in terms of discrete mathematics](https://en.wikipedia.org/wiki/Graph_(discrete_mathematics))) in given images and 
 photos (e.g. graphs from publications, hand drawn ones, etc.).
 
+<img align="right" width="62%" src="./readme_imgs/input_and_output.jpg">
+
 Table of contents:
 - [Introduction](#introduction)
 - [Technologies](#technologies)
@@ -15,15 +17,11 @@ Table of contents:
 - [Future development](#future-development)
 - [References and Authors](#references-and-authors)
 
-<img align="right" width="62%" src="./readme_imgs/input_and_output.jpg">
-
 ## Introduction
 
 Running the algorithm (script) results in files with
-information about recognised graph. Example is given below - input image on the left, and resulting GraphML file on the 
+information about recognised graph. Example is given above - input image on the left, and resulting GraphML file on the 
 right (opened in [yEd Live](https://www.yworks.com/yed-live/) graph editor).
-
-![result of graph recognition](./readme_imgs/input_and_output.jpg)
 
 ## Technologies 
 This project was developed using following technologies:
